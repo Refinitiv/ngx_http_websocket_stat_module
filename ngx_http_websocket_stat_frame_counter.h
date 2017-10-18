@@ -22,7 +22,7 @@ typedef enum
 } frame_type;
 
 // Structure representing frame statistic and parsing stage
-typedef struct ngx_frame_counter_s {
+typedef struct {
    // statistic fields
    ngx_int_t frames;
    ngx_int_t total_payload_size; 

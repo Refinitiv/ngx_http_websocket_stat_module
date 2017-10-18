@@ -3,6 +3,11 @@
 #include <ngx_http.h>
 #include "ngx_http_websocket_stat_frame_counter.h"
 
+typedef struct {
+  ngx_frame_counter_t frame_counter_in;
+  ngx_frame_counter_t frame_counter_out;
+} ngx_http_websocket_stat_ctx;
+
 static char *ngx_http_websocket_stat(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static char *ngx_http_ws_proxy(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static ngx_int_t ngx_http_ws_proxy_handler(ngx_http_request_t *r);
@@ -350,19 +355,29 @@ ngx_frame_counter_t frame_cnt_out;
 ssize_t my_send(ngx_connection_t *c, u_char *buf, size_t size)
 {
 
+   ngx_http_request_t   *r;
+   ngx_http_websocket_stat_ctx *ctx;
+   r = (ngx_http_request_t *)c->data;
+   ctx = ngx_http_get_module_ctx(r, ngx_http_websocket_stat_module);
+
   ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
                 "send");
-   frame_counter_process_data(buf, size, &frame_cnt_in);
+   frame_counter_process_data(buf, size, &ctx->frame_counter_in);
    return orig_send(c, buf, size);
 }
 
 // Packets received from a client
 ssize_t my_recv(ngx_connection_t *c, u_char *buf, size_t size)
 {
-  ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+   ngx_http_request_t   *r;
+   ngx_http_websocket_stat_ctx *ctx;
+   r = (ngx_http_request_t *)c->data;
+   ctx = ngx_http_get_module_ctx(r, ngx_http_websocket_stat_module);
+
+   ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
                 "recv");
    int n = orig_recv(c, buf, size);
-   frame_counter_process_data(buf, n, &frame_cnt_out);
+   frame_counter_process_data(buf, n, &ctx->frame_counter_out);
 
    return n;
 }
@@ -380,6 +395,12 @@ ngx_http_websocket_stat_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
          //connection opened
         ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
                       "opened !!!!");
+         ngx_http_websocket_stat_ctx *ctx;
+          ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_websocket_stat_ctx));
+          if (ctx == NULL) {
+              return NGX_HTTP_INTERNAL_SERVER_ERROR;
+          }
+          ngx_http_set_ctx(r, ctx, ngx_http_websocket_stat_module);
         orig_recv = r->connection->recv;
          r->connection->recv = my_recv;
         orig_send = r->connection->send;
