@@ -337,7 +337,6 @@ static char *ngx_http_ws_proxy(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         return NGX_CONF_ERROR;
     }
 
-    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "Conf ok" );
     return NGX_CONF_OK;
 }
 
