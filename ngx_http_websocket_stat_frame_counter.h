@@ -29,4 +29,5 @@ typedef struct {
 } ngx_frame_counter_t;
 
 void frame_counter_process_data(u_char *buffer, size_t size,
-                                ngx_frame_counter_t *frame_counter);
+                                ngx_frame_counter_t *frame_counter, 
+                                ngx_log_t *log);

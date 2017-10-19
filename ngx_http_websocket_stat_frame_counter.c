@@ -112,7 +112,7 @@ char parse_message(u_char **buffer, size_t *size,
 }
 
 void frame_counter_process_data(u_char *buffer, size_t size,
-                                ngx_frame_counter_t *frame_counter) {
+                                ngx_frame_counter_t *frame_counter, ngx_log_t *log) {
   frame_counter->total_size += size;
   while (size) {
     if (parse_message(&buffer, &size, frame_counter)) {
@@ -121,10 +121,10 @@ void frame_counter_process_data(u_char *buffer, size_t size,
       sprintf(buff, "received frame of type %s, payload is %lu",
               frame_type_to_str(frame_counter->current_frame_type),
               frame_counter->current_payload_size);
-      ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, buff);
+      ngx_log_error(NGX_LOG_NOTICE, log, 0, buff);
       sprintf(buff, "total size is %lu, total payload size is %lu",
               frame_counter->total_size, frame_counter->total_payload_size);
-      ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, buff);
+      ngx_log_error(NGX_LOG_NOTICE, log, 0, buff);
     }
   }
 }
