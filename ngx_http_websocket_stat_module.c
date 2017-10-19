@@ -164,7 +164,6 @@ ssize_t (*orig_send)(ngx_connection_t *c, u_char *buf, size_t size);
 // Packets that being send to a client
 ssize_t my_send(ngx_connection_t *c, u_char *buf, size_t size) {
 
-  ngx_log_error(NGX_LOG_NOTICE, ws_log, 0, "send");
   ngx_http_websocket_stat_ctx *ctx;
   ctx = stat_counter;
   ssize_t sz = size;
@@ -187,7 +186,6 @@ ssize_t my_send(ngx_connection_t *c, u_char *buf, size_t size) {
 // Packets received from a client
 ssize_t my_recv(ngx_connection_t *c, u_char *buf, size_t size) {
 
-  ngx_log_error(NGX_LOG_NOTICE, ws_log, 0, "recv");
   int n = orig_recv(c, buf, size);
 
   ngx_http_websocket_stat_ctx *ctx;
@@ -217,7 +215,7 @@ static ngx_int_t ngx_http_websocket_stat_body_filter(ngx_http_request_t *r,
   if (r->upstream->upgrade) {
     if (r->upstream->peer.connection) {
       // connection opened
-      ngx_log_error(NGX_LOG_NOTICE, ws_log, 0, "opened !!!!");
+      ngx_log_error(NGX_LOG_NOTICE, ws_log, 0, "%V opened", &r->connection->addr_text);
       ngx_http_websocket_stat_ctx *ctx;
       ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_websocket_stat_ctx));
       if (ctx == NULL) {
@@ -231,7 +229,7 @@ static ngx_int_t ngx_http_websocket_stat_body_filter(ngx_http_request_t *r,
       ngx_atomic_fetch_add(&ngx_websocket_stat_active, 1);
     } else {
       ngx_atomic_fetch_add(&ngx_websocket_stat_active, -1);
-      ngx_log_error(NGX_LOG_NOTICE, ws_log, 0, "closed!!!!");
+      ngx_log_error(NGX_LOG_NOTICE, ws_log, 0, "%V closed", &r->connection->addr_text);
     }
   }
 
