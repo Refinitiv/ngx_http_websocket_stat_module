@@ -26,7 +26,7 @@ void move_buffer(u_char **buffer, ssize_t *size, int step) {
 }
 
 char frame_counter_process_message(u_char **buffer, ssize_t *size,
-                   ngx_frame_counter_t *frame_counter) {
+                                   ngx_frame_counter_t *frame_counter) {
   while (*size > 0) {
     switch (frame_counter->stage) {
     case HEADER:
@@ -40,10 +40,9 @@ char frame_counter_process_message(u_char **buffer, ssize_t *size,
       u_char len = **buffer & 0x7f;
       move_buffer(buffer, size, 1);
       if (len < 126) {
-        if (len == 0 && !frame_counter->payload_masked)
-        {
-           frame_counter->stage = HEADER;
-           return 1;
+        if (len == 0 && !frame_counter->payload_masked) {
+          frame_counter->stage = HEADER;
+          return 1;
         }
         frame_counter->current_payload_size = len;
         frame_counter->stage = frame_counter->payload_masked ? MASK : PAYLOAD;
@@ -84,10 +83,9 @@ char frame_counter_process_message(u_char **buffer, ssize_t *size,
       move_buffer(buffer, size, 1);
       frame_counter->bytes_consumed++;
       if (frame_counter->bytes_consumed == MASK_SIZE) {
-        if (frame_counter->current_payload_size == 0)
-        {
-           frame_counter->stage = HEADER;
-           return 1;
+        if (frame_counter->current_payload_size == 0) {
+          frame_counter->stage = HEADER;
+          return 1;
         }
         frame_counter->bytes_consumed = 0;
         frame_counter->stage = PAYLOAD;
@@ -120,4 +118,3 @@ char frame_counter_process_message(u_char **buffer, ssize_t *size,
   }
   return 0;
 }
-

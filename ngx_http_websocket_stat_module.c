@@ -13,7 +13,8 @@ ngx_http_websocket_stat_ctx *stat_counter;
 
 static char *ngx_http_websocket_stat(ngx_conf_t *cf, ngx_command_t *cmd,
                                      void *conf);
-static char *ngx_http_ws_logfile(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+static char *ngx_http_ws_logfile(ngx_conf_t *cf, ngx_command_t *cmd,
+                                 void *conf);
 static ngx_int_t ngx_http_websocket_stat_handler(ngx_http_request_t *r);
 static ngx_int_t ngx_http_websocket_stat_init(ngx_conf_t *cf);
 
@@ -28,12 +29,11 @@ ngx_log_t *ws_log = NULL;
 typedef struct ngx_http_websocket_local_conf_s {
 } ngx_http_websocket_local_conf_t;
 
-
 ssize_t (*orig_recv)(ngx_connection_t *c, u_char *buf, size_t size);
 
 static ngx_command_t ngx_http_websocket_stat_commands[] = {
 
-    {ngx_string("ws_stat"),        /* directive */
+    {ngx_string("ws_stat"),               /* directive */
      NGX_HTTP_LOC_CONF | NGX_CONF_NOARGS, /* location context and takes
                                              no arguments*/
      ngx_http_websocket_stat,             /* configuration setup function */
@@ -77,8 +77,7 @@ ngx_module_t ngx_http_websocket_stat_module = {
 
 static ngx_http_output_body_filter_pt ngx_http_next_body_filter;
 
-static u_char responce_template[] =
-                                    "WebSocket connections: %lu\n"
+static u_char responce_template[] = "WebSocket connections: %lu\n"
                                     "Incoming Websocket data: %lu bytes\n"
                                     "Incoming TCP data: %lu bytes\n"
                                     "Outgoing websocket data: %lu bytes\n"
@@ -100,13 +99,11 @@ static ngx_int_t ngx_http_websocket_stat_handler(ngx_http_request_t *r) {
   /* Insertion in the buffer chain. */
   out.buf = b;
   out.next = NULL;
-  sprintf((char *)msg, (char *)responce_template, 
-                       ngx_websocket_stat_active, 
-                       stat_counter->frame_counter_in.total_payload_size, 
-                       stat_counter->frame_counter_in.total_size, 
-                       stat_counter->frame_counter_out.total_payload_size,
-                       stat_counter->frame_counter_out.total_size
-                       );
+  sprintf((char *)msg, (char *)responce_template, ngx_websocket_stat_active,
+          stat_counter->frame_counter_in.total_payload_size,
+          stat_counter->frame_counter_in.total_size,
+          stat_counter->frame_counter_out.total_payload_size,
+          stat_counter->frame_counter_out.total_size);
 
   b->pos = msg; /* first position in memory of the data */
   b->last = msg + strlen((char *)msg); /* last position in memory of the data */
@@ -146,16 +143,17 @@ static char *ngx_http_websocket_stat(ngx_conf_t *cf, ngx_command_t *cmd,
   return NGX_CONF_OK;
 } /* ngx_http_hello_world */
 
-static char *ngx_http_ws_logfile(ngx_conf_t *cf, ngx_command_t *cmd, void *conf) {
+static char *ngx_http_ws_logfile(ngx_conf_t *cf, ngx_command_t *cmd,
+                                 void *conf) {
 
-   ws_log = ngx_palloc(cf->pool, sizeof(ngx_log_t));
-   ngx_memzero(ws_log, sizeof(ngx_log_t));
+  ws_log = ngx_palloc(cf->pool, sizeof(ngx_log_t));
+  ngx_memzero(ws_log, sizeof(ngx_log_t));
 
-   ngx_str_t *value;
-   value = cf->args->elts;
-   ws_log->log_level = NGX_LOG_NOTICE;
-   assert(cf->args->nelts >= 2);
-   ws_log->file = ngx_conf_open_file(cf->cycle, &value[1]);
+  ngx_str_t *value;
+  value = cf->args->elts;
+  ws_log->log_level = NGX_LOG_NOTICE;
+  assert(cf->args->nelts >= 2);
+  ws_log->file = ngx_conf_open_file(cf->cycle, &value[1]);
 
   return NGX_CONF_OK;
 }
@@ -166,7 +164,6 @@ ssize_t (*orig_send)(ngx_connection_t *c, u_char *buf, size_t size);
 // Packets that being send to a client
 ssize_t my_send(ngx_connection_t *c, u_char *buf, size_t size) {
 
-
   ngx_log_error(NGX_LOG_NOTICE, ws_log, 0, "send");
   ngx_http_websocket_stat_ctx *ctx;
   ctx = stat_counter;
@@ -174,17 +171,15 @@ ssize_t my_send(ngx_connection_t *c, u_char *buf, size_t size) {
   u_char *buffer = buf;
   ngx_frame_counter_t *frame_counter = &ctx->frame_counter_out;
   frame_counter->total_size += sz;
-  while(sz > 0)
-  {
-      if(frame_counter_process_message(&buffer, &sz,  frame_counter))
-      {
-         frame_counter->frames++;
-         frame_counter->total_payload_size += frame_counter->current_payload_size;
-         ngx_log_error(NGX_LOG_NOTICE, ws_log, 0, 
-                 "outgoing frame type: %s, payload is %l",
-                 frame_type_to_str(frame_counter->current_frame_type),
-                 frame_counter->current_payload_size);
-      }
+  while (sz > 0) {
+    if (frame_counter_process_message(&buffer, &sz, frame_counter)) {
+      frame_counter->frames++;
+      frame_counter->total_payload_size += frame_counter->current_payload_size;
+      ngx_log_error(NGX_LOG_NOTICE, ws_log, 0,
+                    "outgoing frame type: %s, payload is %l",
+                    frame_type_to_str(frame_counter->current_frame_type),
+                    frame_counter->current_payload_size);
+    }
   }
   return orig_send(c, buf, size);
 }
@@ -200,17 +195,15 @@ ssize_t my_recv(ngx_connection_t *c, u_char *buf, size_t size) {
   ssize_t sz = n;
   ngx_frame_counter_t *frame_counter = &ctx->frame_counter_in;
   frame_counter->total_size += n;
-  while(sz > 0)
-  {
-      if(frame_counter_process_message(&buf, &sz,  frame_counter))
-      {
-         frame_counter->frames++;
-         frame_counter->total_payload_size += frame_counter->current_payload_size;
-         ngx_log_error(NGX_LOG_NOTICE, ws_log, 0, 
-                 "incoming frame type: %s, payload is %l",
-                 frame_type_to_str(frame_counter->current_frame_type),
-                 frame_counter->current_payload_size);
-      }
+  while (sz > 0) {
+    if (frame_counter_process_message(&buf, &sz, frame_counter)) {
+      frame_counter->frames++;
+      frame_counter->total_payload_size += frame_counter->current_payload_size;
+      ngx_log_error(NGX_LOG_NOTICE, ws_log, 0,
+                    "incoming frame type: %s, payload is %l",
+                    frame_type_to_str(frame_counter->current_frame_type),
+                    frame_counter->current_payload_size);
+    }
   }
 
   return n;

@@ -29,5 +29,5 @@ typedef struct {
 } ngx_frame_counter_t;
 
 char frame_counter_process_message(u_char **buffer, ssize_t *size,
-                   ngx_frame_counter_t *frame_counter);
+                                   ngx_frame_counter_t *frame_counter);
 const char *frame_type_to_str(frame_type frame);
