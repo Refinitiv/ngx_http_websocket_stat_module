@@ -28,6 +28,6 @@ typedef struct {
   ngx_int_t current_payload_size;
 } ngx_frame_counter_t;
 
-void frame_counter_process_data(u_char *buffer, size_t size,
-                                ngx_frame_counter_t *frame_counter, 
-                                ngx_log_t *log);
+char frame_counter_process_message(u_char **buffer, ssize_t *size,
+                   ngx_frame_counter_t *frame_counter);
+const char *frame_type_to_str(frame_type frame);

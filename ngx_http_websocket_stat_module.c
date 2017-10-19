@@ -9,6 +9,8 @@ typedef struct {
   ngx_frame_counter_t frame_counter_out;
 } ngx_http_websocket_stat_ctx;
 
+ngx_http_websocket_stat_ctx *stat_counter;
+
 static char *ngx_http_websocket_stat(ngx_conf_t *cf, ngx_command_t *cmd,
                                      void *conf);
 static char *ngx_http_ws_logfile(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
@@ -31,7 +33,7 @@ ssize_t (*orig_recv)(ngx_connection_t *c, u_char *buf, size_t size);
 
 static ngx_command_t ngx_http_websocket_stat_commands[] = {
 
-    {ngx_string("websocket_stat"),        /* directive */
+    {ngx_string("ws_stat"),        /* directive */
      NGX_HTTP_LOC_CONF | NGX_CONF_NOARGS, /* location context and takes
                                              no arguments*/
      ngx_http_websocket_stat,             /* configuration setup function */
@@ -75,18 +77,18 @@ ngx_module_t ngx_http_websocket_stat_module = {
 
 static ngx_http_output_body_filter_pt ngx_http_next_body_filter;
 
-static u_char responce_template[] = "HTTP connections: %lu\n"
+static u_char responce_template[] =
                                     "WebSocket connections: %lu\n"
-                                    "Total connections: %lu";
+                                    "Incoming Websocket data: %lu bytes\n"
+                                    "Incoming TCP data: %lu bytes\n"
+                                    "Outgoing websocket data: %lu bytes\n"
+                                    "Outgoing TCP data: %lu bytes\n";
 
 u_char msg[sizeof(responce_template) + 3 * NGX_ATOMIC_T_LEN];
 
 static ngx_int_t ngx_http_websocket_stat_handler(ngx_http_request_t *r) {
   ngx_buf_t *b;
   ngx_chain_t out;
-  ngx_atomic_int_t ac, wac;
-  ac = *ngx_stat_active;
-  wac = ngx_websocket_stat_active;
 
   /* Set the Content-Type header. */
   r->headers_out.content_type.len = sizeof("text/plain") - 1;
@@ -98,7 +100,13 @@ static ngx_int_t ngx_http_websocket_stat_handler(ngx_http_request_t *r) {
   /* Insertion in the buffer chain. */
   out.buf = b;
   out.next = NULL;
-  sprintf((char *)msg, (char *)responce_template, ac - wac, wac, ac);
+  sprintf((char *)msg, (char *)responce_template, 
+                       ngx_websocket_stat_active, 
+                       stat_counter->frame_counter_in.total_payload_size, 
+                       stat_counter->frame_counter_in.total_size, 
+                       stat_counter->frame_counter_out.total_payload_size,
+                       stat_counter->frame_counter_out.total_size
+                       );
 
   b->pos = msg; /* first position in memory of the data */
   b->last = msg + strlen((char *)msg); /* last position in memory of the data */
@@ -110,7 +118,6 @@ static ngx_int_t ngx_http_websocket_stat_handler(ngx_http_request_t *r) {
   /* Get the content length of the body. */
   r->headers_out.content_length_n = strlen((char *)msg);
   ngx_http_send_header(r); /* Send the headers */
-  ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "Module handler invoked");
 
   /* Send the body, and return the status code of the output filter chain. */
   return ngx_http_output_filter(r, &out);
@@ -156,32 +163,55 @@ static char *ngx_http_ws_logfile(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 ssize_t (*orig_recv)(ngx_connection_t *c, u_char *buf, size_t size);
 ssize_t (*orig_send)(ngx_connection_t *c, u_char *buf, size_t size);
 
-ngx_frame_counter_t frame_cnt_in;
-ngx_frame_counter_t frame_cnt_out;
-
 // Packets that being send to a client
 ssize_t my_send(ngx_connection_t *c, u_char *buf, size_t size) {
 
-  ngx_http_request_t *r;
-  ngx_http_websocket_stat_ctx *ctx;
-  r = (ngx_http_request_t *)c->data;
-  ctx = ngx_http_get_module_ctx(r, ngx_http_websocket_stat_module);
 
   ngx_log_error(NGX_LOG_NOTICE, ws_log, 0, "send");
-  frame_counter_process_data(buf, size, &ctx->frame_counter_in, ws_log);
+  ngx_http_websocket_stat_ctx *ctx;
+  ctx = stat_counter;
+  ssize_t sz = size;
+  u_char *buffer = buf;
+  ngx_frame_counter_t *frame_counter = &ctx->frame_counter_out;
+  frame_counter->total_size += sz;
+  while(sz > 0)
+  {
+      if(frame_counter_process_message(&buffer, &sz,  frame_counter))
+      {
+         frame_counter->frames++;
+         frame_counter->total_payload_size += frame_counter->current_payload_size;
+         ngx_log_error(NGX_LOG_NOTICE, ws_log, 0, 
+                 "outgoing frame type: %s, payload is %l",
+                 frame_type_to_str(frame_counter->current_frame_type),
+                 frame_counter->current_payload_size);
+      }
+  }
   return orig_send(c, buf, size);
 }
 
 // Packets received from a client
 ssize_t my_recv(ngx_connection_t *c, u_char *buf, size_t size) {
-  ngx_http_request_t *r;
-  ngx_http_websocket_stat_ctx *ctx;
-  r = (ngx_http_request_t *)c->data;
-  ctx = ngx_http_get_module_ctx(r, ngx_http_websocket_stat_module);
 
   ngx_log_error(NGX_LOG_NOTICE, ws_log, 0, "recv");
   int n = orig_recv(c, buf, size);
-  frame_counter_process_data(buf, n, &ctx->frame_counter_out, ws_log);
+
+  ngx_http_websocket_stat_ctx *ctx;
+  ctx = stat_counter;
+  ssize_t sz = n;
+  ngx_frame_counter_t *frame_counter = &ctx->frame_counter_in;
+  frame_counter->total_size += n;
+  while(sz > 0)
+  {
+      if(frame_counter_process_message(&buf, &sz,  frame_counter))
+      {
+         frame_counter->frames++;
+         frame_counter->total_payload_size += frame_counter->current_payload_size;
+         ngx_log_error(NGX_LOG_NOTICE, ws_log, 0, 
+                 "incoming frame type: %s, payload is %l",
+                 frame_type_to_str(frame_counter->current_frame_type),
+                 frame_counter->current_payload_size);
+      }
+  }
 
   return n;
 }
@@ -217,6 +247,8 @@ static ngx_int_t ngx_http_websocket_stat_body_filter(ngx_http_request_t *r,
 
 static void *ngx_http_websocket_stat_create_loc_conf(ngx_conf_t *cf) {
   ngx_http_websocket_local_conf_t *conf;
+
+  stat_counter = ngx_pcalloc(cf->pool, sizeof(ngx_http_websocket_stat_ctx));
 
   conf = ngx_pcalloc(cf->pool, sizeof(ngx_http_websocket_local_conf_t));
   if (conf == NULL) {

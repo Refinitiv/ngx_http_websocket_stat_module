@@ -19,14 +19,13 @@ const char *frame_type_to_str(frame_type frame) {
     return "unknown";
   }
 }
-char buff[200];
 
-void move_buffer(u_char **buffer, size_t *size, int step) {
+void move_buffer(u_char **buffer, ssize_t *size, int step) {
   *buffer += step;
   *size -= step;
 }
 
-char parse_message(u_char **buffer, size_t *size,
+char frame_counter_process_message(u_char **buffer, ssize_t *size,
                    ngx_frame_counter_t *frame_counter) {
   while (*size > 0) {
     switch (frame_counter->stage) {
@@ -39,7 +38,13 @@ char parse_message(u_char **buffer, size_t *size,
     case PAYLOAD_LEN:
       frame_counter->payload_masked = **buffer >> 7;
       u_char len = **buffer & 0x7f;
+      move_buffer(buffer, size, 1);
       if (len < 126) {
+        if (len == 0 && !frame_counter->payload_masked)
+        {
+           frame_counter->stage = HEADER;
+           return 1;
+        }
         frame_counter->current_payload_size = len;
         frame_counter->stage = frame_counter->payload_masked ? MASK : PAYLOAD;
       } else if (len == 126) {
@@ -49,8 +54,8 @@ char parse_message(u_char **buffer, size_t *size,
       } else {
         // WTF?
         ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "Wrong payload length");
+        exit(-1);
       }
-      move_buffer(buffer, size, 1);
       break;
     case PAYLOAD_LEN_LARGE:
     case PAYLOAD_LEN_HUGE: {
@@ -76,9 +81,14 @@ char parse_message(u_char **buffer, size_t *size,
     }
     case MASK:
       assert(frame_counter->payload_masked);
-      frame_counter->bytes_consumed++;
       move_buffer(buffer, size, 1);
+      frame_counter->bytes_consumed++;
       if (frame_counter->bytes_consumed == MASK_SIZE) {
+        if (frame_counter->current_payload_size == 0)
+        {
+           frame_counter->stage = HEADER;
+           return 1;
+        }
         frame_counter->bytes_consumed = 0;
         frame_counter->stage = PAYLOAD;
       }
@@ -111,20 +121,3 @@ char parse_message(u_char **buffer, size_t *size,
   return 0;
 }
 
-void frame_counter_process_data(u_char *buffer, size_t size,
-                                ngx_frame_counter_t *frame_counter, ngx_log_t *log) {
-  frame_counter->total_size += size;
-  while (size) {
-    if (parse_message(&buffer, &size, frame_counter)) {
-      frame_counter->frames++;
-      frame_counter->total_payload_size += frame_counter->current_payload_size;
-      sprintf(buff, "received frame of type %s, payload is %lu",
-              frame_type_to_str(frame_counter->current_frame_type),
-              frame_counter->current_payload_size);
-      ngx_log_error(NGX_LOG_NOTICE, log, 0, buff);
-      sprintf(buff, "total size is %lu, total payload size is %lu",
-              frame_counter->total_size, frame_counter->total_payload_size);
-      ngx_log_error(NGX_LOG_NOTICE, log, 0, buff);
-    }
-  }
-}
