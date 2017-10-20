@@ -1,4 +1,5 @@
 #include "ngx_http_websocket_stat_frame_counter.h"
+#include "ngx_http_websocket_stat_format.h"
 #include <assert.h>
 #include <ngx_config.h>
 #include <ngx_core.h>
@@ -14,6 +15,8 @@ ngx_http_websocket_stat_ctx *stat_counter;
 static char *ngx_http_websocket_stat(ngx_conf_t *cf, ngx_command_t *cmd,
                                      void *conf);
 static char *ngx_http_ws_logfile(ngx_conf_t *cf, ngx_command_t *cmd,
+                                 void *conf);
+static char *ngx_http_ws_log_format(ngx_conf_t *cf, ngx_command_t *cmd,
                                  void *conf);
 static ngx_int_t ngx_http_websocket_stat_handler(ngx_http_request_t *r);
 static ngx_int_t ngx_http_websocket_stat_init(ngx_conf_t *cf);
@@ -42,6 +45,8 @@ static ngx_command_t ngx_http_websocket_stat_commands[] = {
      NULL},
     {ngx_string("ws_log"), NGX_HTTP_SRV_CONF | NGX_CONF_TAKE1,
      ngx_http_ws_logfile, 0, 0, NULL},
+    {ngx_string("ws_log_format"), NGX_HTTP_SRV_CONF | NGX_CONF_TAKE1,
+     ngx_http_ws_log_format, 0, 0, NULL},
     ngx_null_command /* command termination */
 };
 
@@ -142,6 +147,13 @@ static char *ngx_http_websocket_stat(ngx_conf_t *cf, ngx_command_t *cmd,
 
   return NGX_CONF_OK;
 } /* ngx_http_hello_world */
+
+static char *ngx_http_ws_log_format(ngx_conf_t *cf, ngx_command_t *cmd,
+                                 void *conf)
+{
+
+  return NGX_CONF_OK;
+}
 
 static char *ngx_http_ws_logfile(ngx_conf_t *cf, ngx_command_t *cmd,
                                  void *conf) {
@@ -254,6 +266,7 @@ static char *ngx_http_websocket_stat_merge_loc_conf(ngx_conf_t *cf,
 }
 
 static ngx_int_t ngx_http_websocket_stat_init(ngx_conf_t *cf) {
+
   ngx_http_next_body_filter = ngx_http_top_body_filter;
   ngx_http_top_body_filter = ngx_http_websocket_stat_body_filter;
 
