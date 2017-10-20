@@ -1,5 +1,5 @@
-#include "ngx_http_websocket_stat_frame_counter.h"
 #include "ngx_http_websocket_stat_format.h"
+#include "ngx_http_websocket_stat_frame_counter.h"
 #include <assert.h>
 #include <ngx_config.h>
 #include <ngx_core.h>
@@ -17,7 +17,7 @@ static char *ngx_http_websocket_stat(ngx_conf_t *cf, ngx_command_t *cmd,
 static char *ngx_http_ws_logfile(ngx_conf_t *cf, ngx_command_t *cmd,
                                  void *conf);
 static char *ngx_http_ws_log_format(ngx_conf_t *cf, ngx_command_t *cmd,
-                                 void *conf);
+                                    void *conf);
 static ngx_int_t ngx_http_websocket_stat_handler(ngx_http_request_t *r);
 static ngx_int_t ngx_http_websocket_stat_init(ngx_conf_t *cf);
 
@@ -149,8 +149,7 @@ static char *ngx_http_websocket_stat(ngx_conf_t *cf, ngx_command_t *cmd,
 } /* ngx_http_hello_world */
 
 static char *ngx_http_ws_log_format(ngx_conf_t *cf, ngx_command_t *cmd,
-                                 void *conf)
-{
+                                    void *conf) {
 
   return NGX_CONF_OK;
 }
@@ -227,7 +226,8 @@ static ngx_int_t ngx_http_websocket_stat_body_filter(ngx_http_request_t *r,
   if (r->upstream->upgrade) {
     if (r->upstream->peer.connection) {
       // connection opened
-      ngx_log_error(NGX_LOG_NOTICE, ws_log, 0, "%V opened", &r->connection->addr_text);
+      ngx_log_error(NGX_LOG_NOTICE, ws_log, 0, "%V opened",
+                    &r->connection->addr_text);
       ngx_http_websocket_stat_ctx *ctx;
       ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_websocket_stat_ctx));
       if (ctx == NULL) {
@@ -241,7 +241,8 @@ static ngx_int_t ngx_http_websocket_stat_body_filter(ngx_http_request_t *r,
       ngx_atomic_fetch_add(&ngx_websocket_stat_active, 1);
     } else {
       ngx_atomic_fetch_add(&ngx_websocket_stat_active, -1);
-      ngx_log_error(NGX_LOG_NOTICE, ws_log, 0, "%V closed", &r->connection->addr_text);
+      ngx_log_error(NGX_LOG_NOTICE, ws_log, 0, "%V closed",
+                    &r->connection->addr_text);
     }
   }
 
