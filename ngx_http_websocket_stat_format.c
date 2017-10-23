@@ -4,14 +4,14 @@
 
 #include "ngx_http_websocket_stat_format.h"
 
+const char PLACE_HOLDER_CHR = 'X';
+
 template_variable null_variable = {NULL, 0, 0, NULL};
 
-const template_variable variables[] = {
-    {VAR_NAME("fuck"), sizeof("sd") - 1, no_fuck},
-    {VAR_NAME("hate"), sizeof("ss") - 1, no_fuck},
-    {VAR_NAME("this"), sizeof("sd") - 1, no_fuck},
-    {VAR_NAME("nginx"), sizeof("sd") - 1, no_fuck},
-    {NULL, 0, 0, NULL}};
+typedef struct {
+  const template_variable *variable;
+  size_t pos;
+} variable_occurance;
 
 static int compare_occurance(const void *_first, const void *_second) {
   const variable_occurance **first = (const variable_occurance **)_first;
@@ -19,8 +19,6 @@ static int compare_occurance(const void *_first, const void *_second) {
   assert((*first)->pos != (*second)->pos);
   return (*first)->pos < (*second)->pos ? -1 : 1;
 }
-
-char *no_fuck() { return "df"; }
 
 void insert_occurance(const template_variable *var, size_t pos,
                       compiled_template *template_cmlp) {
@@ -67,14 +65,19 @@ size_t estimate_size(compiled_template *template_cmpl) {
 
 void _compile_template(compiled_template *template_cmpl) {
 
-  if (template_cmpl->variable_occurances->nelts == 0)
+  if (template_cmpl->variable_occurances->nelts == 0) {
+    template_cmpl->compiled_template_str = template_cmpl->template;
+    template_cmpl->max_result_len =
+        strlen(template_cmpl->compiled_template_str);
     return;
+  }
 
   size_t size = estimate_size(template_cmpl);
   template_cmpl->compiled_template_str =
       ngx_palloc(template_cmpl->pool, size + 1);
   char *result_ptr = template_cmpl->compiled_template_str;
   const char *template_ptr = template_cmpl->template;
+  size_t template_len = strlen(template_cmpl->template);
 
   for (unsigned int i = 0; i < template_cmpl->variable_occurances->nelts; i++) {
     variable_occurance *occ =
@@ -83,39 +86,58 @@ void _compile_template(compiled_template *template_cmpl) {
     memcpy(result_ptr, template_ptr, s);
     template_ptr += s;
     result_ptr += s;
-    memset(result_ptr, 'X', occ->variable->len);
+    memset(result_ptr, PLACE_HOLDER_CHR, occ->variable->len);
     occ->pos = result_ptr - template_cmpl->compiled_template_str;
     result_ptr += occ->variable->len;
     template_ptr += occ->variable->name_len;
   }
-  int s = (template_ptr - template_cmpl->template);
+  int s = (template_len - (template_ptr - template_cmpl->template));
   memcpy(result_ptr, template_ptr, s);
   result_ptr += s;
   *result_ptr = '\0';
+  template_cmpl->max_result_len = strlen(template_cmpl->compiled_template_str);
 }
 
-char *apply_template(compiled_template *template_cmpl) {
+void _remove_placeholder_chars(char *str) {
+  char *result_ptr = str;
+  while (*str != '\0') {
+    if (*str != PLACE_HOLDER_CHR) {
+      *result_ptr = *str;
+      result_ptr++;
+    }
+    str++;
+  }
+  *result_ptr = '\0';
+}
+
+char *apply_template(compiled_template *template_cmpl, ngx_http_request_t *r,
+                     void *data) {
   char *result = malloc(strlen(template_cmpl->compiled_template_str) + 1);
   strcpy(result, template_cmpl->compiled_template_str);
   for (unsigned int i = 0; i < template_cmpl->variable_occurances->nelts; i++) {
     variable_occurance *occ =
         ((variable_occurance **)template_cmpl->variable_occurances->elts)[i];
-    char *op = occ->variable->operation();
-    memcpy(result + occ->pos, op, occ->variable->len);
+    const char *op = occ->variable->operation(r, data);
+    size_t len = strlen(op);
+    memcpy(result + occ->pos, op,
+           occ->variable->len < len ? occ->variable->len : len);
   }
+  _remove_placeholder_chars(result);
   return result;
 }
 
-compiled_template *compile_template(const char *template,
-                                    template_variable *variables,
+compiled_template *compile_template(ngx_str_t *template,
+                                    const template_variable *variables,
                                     ngx_pool_t *pool) {
   compiled_template *templ = ngx_palloc(pool, sizeof(compiled_template));
   templ->variable_occurances =
       ngx_array_create(pool, 10, sizeof(variable_occurance *));
   templ->variables = variables;
-  templ->template = template;
+  templ->template = ngx_palloc(pool, template->len + 1);
+  memcpy(templ->template, template->data, template->len);
+  templ->template[template->len] = '\0';
   templ->pool = pool;
-  find_variables(template, templ);
+  find_variables(templ->template, templ);
   _compile_template(templ);
   return templ;
 }

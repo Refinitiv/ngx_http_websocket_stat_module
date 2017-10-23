@@ -6,11 +6,19 @@
 #include <ngx_http.h>
 
 typedef struct {
-  ngx_frame_counter_t frame_counter_in;
-  ngx_frame_counter_t frame_counter_out;
+   time_t ws_conn_start_time;
 } ngx_http_websocket_stat_ctx;
 
+ngx_frame_counter_t frame_counter_in;
+ngx_frame_counter_t frame_counter_out;
+
 ngx_http_websocket_stat_ctx *stat_counter;
+typedef struct {
+  ngx_frame_counter_t *counter;
+  int from_client;
+   ngx_http_websocket_stat_ctx *ws_ctx;
+
+} template_ctx_s;
 
 static char *ngx_http_websocket_stat(ngx_conf_t *cf, ngx_command_t *cmd,
                                      void *conf);
@@ -31,6 +39,8 @@ ngx_log_t *ws_log = NULL;
 
 typedef struct ngx_http_websocket_local_conf_s {
 } ngx_http_websocket_local_conf_t;
+
+compiled_template *log_template;
 
 ssize_t (*orig_recv)(ngx_connection_t *c, u_char *buf, size_t size);
 
@@ -105,10 +115,10 @@ static ngx_int_t ngx_http_websocket_stat_handler(ngx_http_request_t *r) {
   out.buf = b;
   out.next = NULL;
   sprintf((char *)msg, (char *)responce_template, ngx_websocket_stat_active,
-          stat_counter->frame_counter_in.total_payload_size,
-          stat_counter->frame_counter_in.total_size,
-          stat_counter->frame_counter_out.total_payload_size,
-          stat_counter->frame_counter_out.total_size);
+          frame_counter_in.total_payload_size,
+          frame_counter_in.total_size,
+          frame_counter_out.total_payload_size,
+          frame_counter_out.total_size);
 
   b->pos = msg; /* first position in memory of the data */
   b->last = msg + strlen((char *)msg); /* last position in memory of the data */
@@ -148,12 +158,6 @@ static char *ngx_http_websocket_stat(ngx_conf_t *cf, ngx_command_t *cmd,
   return NGX_CONF_OK;
 } /* ngx_http_hello_world */
 
-static char *ngx_http_ws_log_format(ngx_conf_t *cf, ngx_command_t *cmd,
-                                    void *conf) {
-
-  return NGX_CONF_OK;
-}
-
 static char *ngx_http_ws_logfile(ngx_conf_t *cf, ngx_command_t *cmd,
                                  void *conf) {
 
@@ -165,6 +169,8 @@ static char *ngx_http_ws_logfile(ngx_conf_t *cf, ngx_command_t *cmd,
   ws_log->log_level = NGX_LOG_NOTICE;
   assert(cf->args->nelts >= 2);
   ws_log->file = ngx_conf_open_file(cf->cycle, &value[1]);
+  if (!ws_log->file)
+      return NGX_CONF_ERROR;
 
   return NGX_CONF_OK;
 }
@@ -176,19 +182,23 @@ ssize_t (*orig_send)(ngx_connection_t *c, u_char *buf, size_t size);
 ssize_t my_send(ngx_connection_t *c, u_char *buf, size_t size) {
 
   ngx_http_websocket_stat_ctx *ctx;
-  ctx = stat_counter;
   ssize_t sz = size;
   u_char *buffer = buf;
-  ngx_frame_counter_t *frame_counter = &ctx->frame_counter_out;
+  ngx_frame_counter_t *frame_counter = &frame_counter_out;
   frame_counter->total_size += sz;
+  ngx_http_request_t *r = c->data;
+  ctx = ngx_http_get_module_ctx(r, ngx_http_websocket_stat_module);
+  template_ctx_s template_ctx;
+  template_ctx.counter = frame_counter;
+  template_ctx.from_client = 0;
+  template_ctx.ws_ctx = ctx;
   while (sz > 0) {
     if (frame_counter_process_message(&buffer, &sz, frame_counter)) {
       frame_counter->frames++;
       frame_counter->total_payload_size += frame_counter->current_payload_size;
-      ngx_log_error(NGX_LOG_NOTICE, ws_log, 0,
-                    "outgoing frame type: %s, payload is %l",
-                    frame_type_to_str(frame_counter->current_frame_type),
-                    frame_counter->current_payload_size);
+      char *log_line = apply_template(log_template, r, &template_ctx);
+      ngx_log_error(NGX_LOG_NOTICE, ws_log, 0, log_line);
+      free(log_line);
     }
   }
   return orig_send(c, buf, size);
@@ -200,18 +210,22 @@ ssize_t my_recv(ngx_connection_t *c, u_char *buf, size_t size) {
   int n = orig_recv(c, buf, size);
 
   ngx_http_websocket_stat_ctx *ctx;
-  ctx = stat_counter;
   ssize_t sz = n;
-  ngx_frame_counter_t *frame_counter = &ctx->frame_counter_in;
+  ngx_frame_counter_t *frame_counter = &frame_counter_in;
+  ngx_http_request_t *r = c->data;
+  ctx = ngx_http_get_module_ctx(r, ngx_http_websocket_stat_module);
   frame_counter->total_size += n;
+  template_ctx_s template_ctx;
+  template_ctx.counter = frame_counter;
+  template_ctx.from_client = 1;
+  template_ctx.ws_ctx = ctx;
   while (sz > 0) {
     if (frame_counter_process_message(&buf, &sz, frame_counter)) {
       frame_counter->frames++;
       frame_counter->total_payload_size += frame_counter->current_payload_size;
-      ngx_log_error(NGX_LOG_NOTICE, ws_log, 0,
-                    "incoming frame type: %s, payload is %l",
-                    frame_type_to_str(frame_counter->current_frame_type),
-                    frame_counter->current_payload_size);
+      char *log_line = apply_template(log_template, r, &template_ctx);
+      ngx_log_error(NGX_LOG_NOTICE, ws_log, 0, log_line);
+      free(log_line);
     }
   }
 
@@ -239,6 +253,7 @@ static ngx_int_t ngx_http_websocket_stat_body_filter(ngx_http_request_t *r,
       orig_send = r->connection->send;
       r->connection->send = my_send;
       ngx_atomic_fetch_add(&ngx_websocket_stat_active, 1);
+      ctx->ws_conn_start_time = ngx_time();
     } else {
       ngx_atomic_fetch_add(&ngx_websocket_stat_active, -1);
       ngx_log_error(NGX_LOG_NOTICE, ws_log, 0, "%V closed",
@@ -249,16 +264,60 @@ static ngx_int_t ngx_http_websocket_stat_body_filter(ngx_http_request_t *r,
   return ngx_http_next_body_filter(r, in);
 }
 
+const char *request(ngx_http_request_t *r, void *data) { return "GET"; }
+char buff[100];
+
+const char *ws_packet_type(ngx_http_request_t *r, void *data) {
+  template_ctx_s *ctx = data;
+  ngx_frame_counter_t *frame_cntr = ctx->counter;
+  return frame_type_to_str(frame_cntr->current_frame_type);
+}
+
+const char *ws_packet_size(ngx_http_request_t *r, void *data) {
+  template_ctx_s *ctx = data;
+  ngx_frame_counter_t *frame_cntr = ctx->counter;
+  sprintf(buff, "%lu", frame_cntr->current_payload_size);
+  return (char *)buff;
+}
+
+const char *ws_packet_direction(ngx_http_request_t *r, void *data) {
+  template_ctx_s *ctx = data;
+  if (ctx->from_client)
+    return "incoming";
+  return "outgoing";
+}
+
+const char *ws_connection_age(ngx_http_request_t *r, void *data) {
+  template_ctx_s *ctx = data;
+  sprintf(buff, "%lu", ngx_time() - ctx->ws_ctx->ws_conn_start_time);
+
+  return (char *)buff;
+}
+
+const template_variable variables[] = {
+    {VAR_NAME("$request_id"), sizeof("GET") - 1, request},
+    {VAR_NAME("$ws_packet_type"), sizeof("ping") - 1, ws_packet_type},
+    {VAR_NAME("$ws_packet_size"), NGX_SIZE_T_LEN, ws_packet_size},
+    {VAR_NAME("$ws_packet_direction"), sizeof("incoming") - 1, ws_packet_direction},
+    {VAR_NAME("$ws_conn_age"), NGX_SIZE_T_LEN, ws_connection_age},
+    {NULL, 0, 0, NULL}};
+
 static void *ngx_http_websocket_stat_create_loc_conf(ngx_conf_t *cf) {
   ngx_http_websocket_local_conf_t *conf;
-
-  stat_counter = ngx_pcalloc(cf->pool, sizeof(ngx_http_websocket_stat_ctx));
 
   conf = ngx_pcalloc(cf->pool, sizeof(ngx_http_websocket_local_conf_t));
   if (conf == NULL) {
     return NULL;
   }
+
   return conf;
+}
+
+static char *ngx_http_ws_log_format(ngx_conf_t *cf, ngx_command_t *cmd,
+                                    void *conf) {
+  ngx_str_t *args = cf->args->elts;
+  log_template = compile_template(&args[1], variables, cf->pool);
+  return NGX_CONF_OK;
 }
 
 static char *ngx_http_websocket_stat_merge_loc_conf(ngx_conf_t *cf,

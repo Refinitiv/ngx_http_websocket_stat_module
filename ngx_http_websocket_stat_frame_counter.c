@@ -4,19 +4,19 @@
 const char *frame_type_to_str(frame_type frame) {
   switch (frame) {
   case CONTINUATION:
-    return "continuation";
+    return "cont";
   case TEXT:
     return "text";
   case BINARY:
-    return "binary";
+    return "bin";
   case CLOSE:
-    return "close";
+    return "cls";
   case PING:
     return "ping";
   case PONG:
     return "pong";
   default:
-    return "unknown";
+    return "uknw";
   }
 }
 
