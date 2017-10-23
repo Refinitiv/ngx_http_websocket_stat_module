@@ -35,7 +35,14 @@ static char *ngx_http_websocket_stat_merge_loc_conf(ngx_conf_t *cf,
 
 static ngx_atomic_t ngx_websocket_stat_active;
 
+char CARET_RETURN = '\n';
 ngx_log_t *ws_log = NULL;
+
+void websocket_log(char *str)
+{
+      ngx_write_fd(ws_log->file->fd, str, strlen(str));
+      ngx_write_fd(ws_log->file->fd, &CARET_RETURN, sizeof(char));
+}
 
 typedef struct ngx_http_websocket_local_conf_s {
 } ngx_http_websocket_local_conf_t;
@@ -197,7 +204,7 @@ ssize_t my_send(ngx_connection_t *c, u_char *buf, size_t size) {
       frame_counter->frames++;
       frame_counter->total_payload_size += frame_counter->current_payload_size;
       char *log_line = apply_template(log_template, r, &template_ctx);
-      ngx_log_error(NGX_LOG_NOTICE, ws_log, 0, log_line);
+      websocket_log(log_line);
       free(log_line);
     }
   }
@@ -224,7 +231,7 @@ ssize_t my_recv(ngx_connection_t *c, u_char *buf, size_t size) {
       frame_counter->frames++;
       frame_counter->total_payload_size += frame_counter->current_payload_size;
       char *log_line = apply_template(log_template, r, &template_ctx);
-      ngx_log_error(NGX_LOG_NOTICE, ws_log, 0, log_line);
+      websocket_log(log_line);
       free(log_line);
     }
   }
@@ -237,12 +244,15 @@ static ngx_int_t ngx_http_websocket_stat_body_filter(ngx_http_request_t *r,
   if (!r->upstream)
     return ngx_http_next_body_filter(r, in);
 
+  char buffer[50];
+  ngx_http_websocket_stat_ctx *ctx;
+
+  
   if (r->upstream->upgrade) {
     if (r->upstream->peer.connection) {
       // connection opened
-      ngx_log_error(NGX_LOG_NOTICE, ws_log, 0, "%V opened",
-                    &r->connection->addr_text);
-      ngx_http_websocket_stat_ctx *ctx;
+      sprintf(buffer, "%s: %s opened", (char *)ngx_cached_http_time.data, (char *)r->connection->addr_text.data);
+      websocket_log(buffer);
       ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_websocket_stat_ctx));
       if (ctx == NULL) {
         return NGX_HTTP_INTERNAL_SERVER_ERROR;
@@ -256,8 +266,9 @@ static ngx_int_t ngx_http_websocket_stat_body_filter(ngx_http_request_t *r,
       ctx->ws_conn_start_time = ngx_time();
     } else {
       ngx_atomic_fetch_add(&ngx_websocket_stat_active, -1);
-      ngx_log_error(NGX_LOG_NOTICE, ws_log, 0, "%V closed",
-                    &r->connection->addr_text);
+      ctx = ngx_http_get_module_ctx(r, ngx_http_websocket_stat_module);
+      sprintf(buffer, "%s: %s closed, age: %lu", (char *)ngx_cached_http_time.data, (char *)r->connection->addr_text.data,  ngx_time() - ctx->ws_conn_start_time);
+      websocket_log(buffer);
     }
   }
 
@@ -294,12 +305,20 @@ const char *ws_connection_age(ngx_http_request_t *r, void *data) {
   return (char *)buff;
 }
 
+const char *local_time(ngx_http_request_t* r , void * data)
+{
+    return memcpy(buff, ngx_cached_http_time.data,
+                      ngx_cached_http_time.len);
+}
+
 const template_variable variables[] = {
     {VAR_NAME("$request_id"), sizeof("GET") - 1, request},
     {VAR_NAME("$ws_packet_type"), sizeof("ping") - 1, ws_packet_type},
     {VAR_NAME("$ws_packet_size"), NGX_SIZE_T_LEN, ws_packet_size},
     {VAR_NAME("$ws_packet_direction"), sizeof("incoming") - 1, ws_packet_direction},
     {VAR_NAME("$ws_conn_age"), NGX_SIZE_T_LEN, ws_connection_age},
+    {VAR_NAME("$time_local"), sizeof("Mon, 23 Oct 2017 11:27:42 GMT") - 1,
+                          local_time},
     {NULL, 0, 0, NULL}};
 
 static void *ngx_http_websocket_stat_create_loc_conf(ngx_conf_t *cf) {
