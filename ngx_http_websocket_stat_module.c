@@ -96,13 +96,13 @@ ngx_module_t ngx_http_websocket_stat_module = {
 
 static ngx_http_output_body_filter_pt ngx_http_next_body_filter;
 
-static u_char responce_template[] = "WebSocket connections: %lu\n"
-                                    "Incoming frames: %lu\n"
-                                    "Outgoing frames: %lu\n"
-                                    "Incoming Websocket data: %lu bytes\n"
-                                    "Incoming TCP data: %lu bytes\n"
-                                    "Outgoing websocket data: %lu bytes\n"
-                                    "Outgoing TCP data: %lu bytes\n";
+static u_char responce_template[] =
+    "WebSocket connections: %lu\n"
+    "client websocket frames  | client websocket payload | client tcp data\n"
+    "%lu %lu %lu\n"
+    "upstream websocket frames  | upstream websocket payload | upstream tcp "
+    "data\n"
+    "%lu %lu %lu\n";
 
 u_char msg[sizeof(responce_template) + 3 * NGX_ATOMIC_T_LEN];
 
@@ -121,8 +121,8 @@ static ngx_int_t ngx_http_websocket_stat_handler(ngx_http_request_t *r) {
   out.buf = b;
   out.next = NULL;
   sprintf((char *)msg, (char *)responce_template, ngx_websocket_stat_active,
-          frame_counter_in.frames, frame_counter_out.frames,
-          frame_counter_in.total_payload_size, frame_counter_in.total_size,
+          frame_counter_in.frames, frame_counter_in.total_payload_size,
+          frame_counter_in.total_size, frame_counter_out.frames,
           frame_counter_out.total_payload_size, frame_counter_out.total_size);
 
   b->pos = msg; /* first position in memory of the data */
@@ -282,7 +282,8 @@ char buff[100];
 const char *ws_packet_type(ngx_http_request_t *r, void *data) {
   template_ctx_s *ctx = data;
   ngx_frame_counter_t *frame_cntr = ctx->counter;
-  return frame_type_to_str(frame_cntr->current_frame_type);
+  sprintf(buff, "%d", frame_cntr->current_frame_type);
+  return  buff;
 }
 
 const char *ws_packet_size(ngx_http_request_t *r, void *data) {
@@ -292,11 +293,11 @@ const char *ws_packet_size(ngx_http_request_t *r, void *data) {
   return (char *)buff;
 }
 
-const char *ws_packet_direction(ngx_http_request_t *r, void *data) {
+const char *ws_packet_source(ngx_http_request_t *r, void *data) {
   template_ctx_s *ctx = data;
   if (ctx->from_client)
-    return "incoming";
-  return "outgoing";
+    return "client";
+  return "upstream";
 }
 
 const char *ws_connection_age(ngx_http_request_t *r, void *data) {
@@ -311,10 +312,9 @@ const char *local_time(ngx_http_request_t *r, void *data) {
 }
 
 const template_variable variables[] = {
-    {VAR_NAME("$ws_packet_type"), sizeof("ping") - 1, ws_packet_type},
-    {VAR_NAME("$ws_packet_size"), NGX_SIZE_T_LEN, ws_packet_size},
-    {VAR_NAME("$ws_packet_direction"), sizeof("incoming") - 1,
-     ws_packet_direction},
+    {VAR_NAME("$ws_opcode"), sizeof("ping") - 1, ws_packet_type},
+    {VAR_NAME("$ws_payload_size"), NGX_SIZE_T_LEN, ws_packet_size},
+    {VAR_NAME("$ws_packet_source"), sizeof("upstream") - 1, ws_packet_source},
     {VAR_NAME("$ws_conn_age"), NGX_SIZE_T_LEN, ws_connection_age},
     {VAR_NAME("$time_local"), sizeof("Mon, 23 Oct 2017 11:27:42 GMT") - 1,
      local_time},
