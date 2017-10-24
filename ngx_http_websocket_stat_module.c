@@ -100,6 +100,8 @@ ngx_module_t ngx_http_websocket_stat_module = {
 static ngx_http_output_body_filter_pt ngx_http_next_body_filter;
 
 static u_char responce_template[] = "WebSocket connections: %lu\n"
+                                    "Incoming frames: %lu\n"
+                                    "Outgoing frames: %lu\n"
                                     "Incoming Websocket data: %lu bytes\n"
                                     "Incoming TCP data: %lu bytes\n"
                                     "Outgoing websocket data: %lu bytes\n"
@@ -122,6 +124,8 @@ static ngx_int_t ngx_http_websocket_stat_handler(ngx_http_request_t *r) {
   out.buf = b;
   out.next = NULL;
   sprintf((char *)msg, (char *)responce_template, ngx_websocket_stat_active,
+          frame_counter_in.frames,
+          frame_counter_out.frames,
           frame_counter_in.total_payload_size,
           frame_counter_in.total_size,
           frame_counter_out.total_payload_size,
@@ -312,7 +316,6 @@ const char *local_time(ngx_http_request_t* r , void * data)
 }
 
 const template_variable variables[] = {
-    {VAR_NAME("$request_id"), sizeof("GET") - 1, request},
     {VAR_NAME("$ws_packet_type"), sizeof("ping") - 1, ws_packet_type},
     {VAR_NAME("$ws_packet_size"), NGX_SIZE_T_LEN, ws_packet_size},
     {VAR_NAME("$ws_packet_direction"), sizeof("incoming") - 1, ws_packet_direction},
