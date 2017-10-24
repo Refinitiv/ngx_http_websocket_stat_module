@@ -5,9 +5,7 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 
-typedef struct {
-   time_t ws_conn_start_time;
-} ngx_http_websocket_stat_ctx;
+typedef struct { time_t ws_conn_start_time; } ngx_http_websocket_stat_ctx;
 
 ngx_frame_counter_t frame_counter_in;
 ngx_frame_counter_t frame_counter_out;
@@ -16,7 +14,7 @@ ngx_http_websocket_stat_ctx *stat_counter;
 typedef struct {
   ngx_frame_counter_t *counter;
   int from_client;
-   ngx_http_websocket_stat_ctx *ws_ctx;
+  ngx_http_websocket_stat_ctx *ws_ctx;
 
 } template_ctx_s;
 
@@ -38,10 +36,9 @@ static ngx_atomic_t ngx_websocket_stat_active;
 char CARET_RETURN = '\n';
 ngx_log_t *ws_log = NULL;
 
-void websocket_log(char *str)
-{
-      ngx_write_fd(ws_log->file->fd, str, strlen(str));
-      ngx_write_fd(ws_log->file->fd, &CARET_RETURN, sizeof(char));
+void websocket_log(char *str) {
+  ngx_write_fd(ws_log->file->fd, str, strlen(str));
+  ngx_write_fd(ws_log->file->fd, &CARET_RETURN, sizeof(char));
 }
 
 typedef struct ngx_http_websocket_local_conf_s {
@@ -124,12 +121,9 @@ static ngx_int_t ngx_http_websocket_stat_handler(ngx_http_request_t *r) {
   out.buf = b;
   out.next = NULL;
   sprintf((char *)msg, (char *)responce_template, ngx_websocket_stat_active,
-          frame_counter_in.frames,
-          frame_counter_out.frames,
-          frame_counter_in.total_payload_size,
-          frame_counter_in.total_size,
-          frame_counter_out.total_payload_size,
-          frame_counter_out.total_size);
+          frame_counter_in.frames, frame_counter_out.frames,
+          frame_counter_in.total_payload_size, frame_counter_in.total_size,
+          frame_counter_out.total_payload_size, frame_counter_out.total_size);
 
   b->pos = msg; /* first position in memory of the data */
   b->last = msg + strlen((char *)msg); /* last position in memory of the data */
@@ -181,7 +175,7 @@ static char *ngx_http_ws_logfile(ngx_conf_t *cf, ngx_command_t *cmd,
   assert(cf->args->nelts >= 2);
   ws_log->file = ngx_conf_open_file(cf->cycle, &value[1]);
   if (!ws_log->file)
-      return NGX_CONF_ERROR;
+    return NGX_CONF_ERROR;
 
   return NGX_CONF_OK;
 }
@@ -251,11 +245,11 @@ static ngx_int_t ngx_http_websocket_stat_body_filter(ngx_http_request_t *r,
   char buffer[50];
   ngx_http_websocket_stat_ctx *ctx;
 
-  
   if (r->upstream->upgrade) {
     if (r->upstream->peer.connection) {
       // connection opened
-      sprintf(buffer, "%s: %s opened", (char *)ngx_cached_http_time.data, (char *)r->connection->addr_text.data);
+      sprintf(buffer, "%s: %s opened", (char *)ngx_cached_http_time.data,
+              (char *)r->connection->addr_text.data);
       websocket_log(buffer);
       ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_websocket_stat_ctx));
       if (ctx == NULL) {
@@ -271,7 +265,10 @@ static ngx_int_t ngx_http_websocket_stat_body_filter(ngx_http_request_t *r,
     } else {
       ngx_atomic_fetch_add(&ngx_websocket_stat_active, -1);
       ctx = ngx_http_get_module_ctx(r, ngx_http_websocket_stat_module);
-      sprintf(buffer, "%s: %s closed, age: %lu", (char *)ngx_cached_http_time.data, (char *)r->connection->addr_text.data,  ngx_time() - ctx->ws_conn_start_time);
+      sprintf(buffer, "%s: %s closed, age: %lu",
+              (char *)ngx_cached_http_time.data,
+              (char *)r->connection->addr_text.data,
+              ngx_time() - ctx->ws_conn_start_time);
       websocket_log(buffer);
     }
   }
@@ -309,19 +306,18 @@ const char *ws_connection_age(ngx_http_request_t *r, void *data) {
   return (char *)buff;
 }
 
-const char *local_time(ngx_http_request_t* r , void * data)
-{
-    return memcpy(buff, ngx_cached_http_time.data,
-                      ngx_cached_http_time.len);
+const char *local_time(ngx_http_request_t *r, void *data) {
+  return memcpy(buff, ngx_cached_http_time.data, ngx_cached_http_time.len);
 }
 
 const template_variable variables[] = {
     {VAR_NAME("$ws_packet_type"), sizeof("ping") - 1, ws_packet_type},
     {VAR_NAME("$ws_packet_size"), NGX_SIZE_T_LEN, ws_packet_size},
-    {VAR_NAME("$ws_packet_direction"), sizeof("incoming") - 1, ws_packet_direction},
+    {VAR_NAME("$ws_packet_direction"), sizeof("incoming") - 1,
+     ws_packet_direction},
     {VAR_NAME("$ws_conn_age"), NGX_SIZE_T_LEN, ws_connection_age},
     {VAR_NAME("$time_local"), sizeof("Mon, 23 Oct 2017 11:27:42 GMT") - 1,
-                          local_time},
+     local_time},
     {NULL, 0, 0, NULL}};
 
 static void *ngx_http_websocket_stat_create_loc_conf(ngx_conf_t *cf) {
