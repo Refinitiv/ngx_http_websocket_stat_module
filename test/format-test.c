@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -16,19 +15,44 @@ const template_variable variables[] = {
      test_func},
     {NULL, 0, 0, NULL}};
 
-int main() {
-  char *template = "Some template $ws_opcode sdkj $ws_packet_source f";
+int test_template(const char *template, const char* expected_result)
+{
   ngx_str_t template_str;
   template_str.data = template;
   template_str.len = strlen(template);
 
   compiled_template *template_cmpl =
       compile_template(&template_str, variables, NULL);
-  printf("test started\n");
-  printf("%s\n", template_cmpl->compiled_template_str);
   char *res = apply_template(template_cmpl, NULL, NULL);
-  char *exp_res = "Some template BINGO sdkj BINGO f";
-  assert(!strcmp(res, exp_res));
-  printf("%s\n", res);
+  if (strcmp(res, expected_result) == 0)
+  {
+     printf("test passed :)\n");
+  }
+  else
+  {
+     printf("Test failed :(\n"
+            "actual  : %s\n"
+            "expected: %s\n", res, expected_result );
+     exit(1);
+  }
+
+  free(template_cmpl->variable_occurances->elts);
+  free(template_cmpl->variable_occurances);
+}
+
+int main() {
+  printf("test started\n");
+  test_template("Some template $ws_opcode sdkj $ws_packet_source f", 
+                "Some template BINGO sdkj BINGO f");
+  test_template("Some template $ws_opcode sdkj f", 
+                "Some template BINGO sdkj f");
+  test_template("Some template f", 
+                "Some template f");
+  test_template("", 
+                "");
+  test_template("$time_local", 
+                "BINGO");
+  test_template("$time_", 
+                "$time_");
   return 0;
 }

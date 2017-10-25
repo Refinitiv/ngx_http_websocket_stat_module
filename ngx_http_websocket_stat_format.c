@@ -1,5 +1,7 @@
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
 
 #include "ngx_http_websocket_stat_format.h"
 
@@ -32,18 +34,16 @@ static int compare_occurance(const void *_first, const void *_second) {
 }
 
 #ifdef TEST
-ngx_array_t *ngx_array_create(void *pool, size_t size, size_t el_size)
-{
-   ngx_array_t *res =  malloc(sizeof(ngx_array_t));
-   res->nelts = 0;
-   res->elts = malloc(100 * el_size);
-   res->el_size = el_size;
-   return res;
+ngx_array_t *ngx_array_create(void *pool, size_t size, size_t el_size) {
+  ngx_array_t *res = malloc(sizeof(ngx_array_t));
+  res->nelts = 0;
+  res->elts = malloc(100 * el_size);
+  res->el_size = el_size;
+  return res;
 }
 
-void * ngx_array_push(ngx_array_t * array)
-{
-   return array->elts + array->nelts++ * array->el_size;
+void *ngx_array_push(ngx_array_t *array) {
+  return array->elts + array->nelts++ * array->el_size;
 }
 #endif
 void insert_occurance(const template_variable *var, size_t pos,

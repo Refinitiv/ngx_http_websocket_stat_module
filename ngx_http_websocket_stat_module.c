@@ -283,7 +283,7 @@ const char *ws_packet_type(ngx_http_request_t *r, void *data) {
   template_ctx_s *ctx = data;
   ngx_frame_counter_t *frame_cntr = ctx->counter;
   sprintf(buff, "%d", frame_cntr->current_frame_type);
-  return  buff;
+  return buff;
 }
 
 const char *ws_packet_size(ngx_http_request_t *r, void *data) {
