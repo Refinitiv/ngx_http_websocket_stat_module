@@ -1,8 +1,29 @@
 #ifndef _NGX_HTTP_WEBSOCKET_FMT
 #define _NGX_HTTP_WEBSOCKET_FMT
 
+#ifdef TEST
+
+#define ngx_http_request_t void
+#define ngx_pool_t void
+#define ngx_palloc(pool, size) \
+         malloc(size)
+
+typedef struct {
+   size_t nelts;
+   void* elts;
+   size_t el_size;
+}ngx_array_t;
+
+typedef struct {
+   char * data;
+   size_t len;
+}ngx_str_t;
+#else 
+
 #include <ngx_core.h>
 #include <ngx_http.h>
+
+#endif
 
 // typedef const char (*template_op)(ngx_http_request_t *r);
 

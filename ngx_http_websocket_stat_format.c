@@ -1,5 +1,4 @@
 #include <assert.h>
-#include <ngx_core.h>
 #include <stdlib.h>
 
 #include "ngx_http_websocket_stat_format.h"
@@ -32,6 +31,21 @@ static int compare_occurance(const void *_first, const void *_second) {
   return (*first)->orig_pos < (*second)->orig_pos ? -1 : 1;
 }
 
+#ifdef TEST
+ngx_array_t *ngx_array_create(void *pool, size_t size, size_t el_size)
+{
+   ngx_array_t *res =  malloc(sizeof(ngx_array_t));
+   res->nelts = 0;
+   res->elts = malloc(100 * el_size);
+   res->el_size = el_size;
+   return res;
+}
+
+void * ngx_array_push(ngx_array_t * array)
+{
+   return array->elts + array->nelts++ * array->el_size;
+}
+#endif
 void insert_occurance(const template_variable *var, size_t pos,
                       compiled_template *template_cmlp, int http_hdr_len) {
   variable_occurance **oc = ngx_array_push(template_cmlp->variable_occurances);
@@ -184,6 +198,7 @@ int compare_hdr(const char *hdr, size_t hdr_len, const char *template) {
 }
 
 const char *http_header_var(ngx_http_request_t *r, void *data) {
+#ifndef TEST
   ngx_list_part_t *part;
   ngx_table_elt_t *header;
   part = &r->headers_in.headers.part;
@@ -202,6 +217,7 @@ const char *http_header_var(ngx_http_request_t *r, void *data) {
       i = part->nelts - 1;
     }
   }
+#endif
 
   return "???";
 }
