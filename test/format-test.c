@@ -52,6 +52,8 @@ int main() {
                 "");
   test_template("$time_local", 
                 "BINGO");
+  test_template("$time_local$ws_opcode$ws_payload_size", 
+                "BINGOBINGOBINGO");
   test_template("$time_", 
                 "$time_");
   return 0;
