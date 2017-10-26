@@ -354,8 +354,10 @@ static void *ngx_http_websocket_stat_create_loc_conf(ngx_conf_t *cf) {
 static char *ngx_http_ws_log_format(ngx_conf_t *cf, ngx_command_t *cmd,
                                     void *conf) {
   ngx_str_t *args = cf->args->elts;
-  if (cf->args->nelts != 2 && cf->args->nelts != 3)
+  if (cf->args->nelts != 2 && cf->args->nelts != 3) {
+    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "Wrong argument number");
     return NGX_CONF_ERROR;
+  }
   if (cf->args->nelts == 2) {
     log_template = compile_template((char *)args[1].data, variables, cf->pool);
     return NGX_CONF_OK;
@@ -369,6 +371,8 @@ static char *ngx_http_ws_log_format(ngx_conf_t *cf, ngx_command_t *cmd,
         compile_template((char *)args[2].data, variables, cf->pool);
     return NGX_CONF_OK;
   } else {
+    ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "Unknown log format keyword\"%V\"",
+                       (ngx_str_t *)&args[1]);
     return NGX_CONF_ERROR;
   }
 }
