@@ -42,6 +42,8 @@ const char *UNKNOWN_VAR = "???";
 void
 websocket_log(char *str)
 {
+    if (!ws_log)
+        return;
     ngx_write_fd(ws_log->file->fd, str, strlen(str));
     ngx_write_fd(ws_log->file->fd, &CARET_RETURN, sizeof(char));
 }
@@ -251,9 +253,11 @@ my_recv(ngx_connection_t *c, u_char *buf, size_t size)
             frame_counter->frames++;
             frame_counter->total_payload_size +=
                 frame_counter->current_payload_size;
-            char *log_line = apply_template(log_template, r, &template_ctx);
-            websocket_log(log_line);
-            free(log_line);
+            if (ws_log) {
+                char *log_line = apply_template(log_template, r, &template_ctx);
+                websocket_log(log_line);
+                free(log_line);
+            }
         }
     }
 
@@ -275,10 +279,12 @@ ngx_http_websocket_stat_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
     if (r->upstream->upgrade) {
         if (r->upstream->peer.connection) {
             // connection opened
-            char *log_line =
-                apply_template(log_open_template, r, &template_ctx);
-            websocket_log(log_line);
-            free(log_line);
+            if (ws_log) {
+                char *log_line =
+                    apply_template(log_open_template, r, &template_ctx);
+                websocket_log(log_line);
+                free(log_line);
+            }
             ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_websocket_stat_ctx));
             if (ctx == NULL) {
                 return NGX_HTTP_INTERNAL_SERVER_ERROR;
@@ -292,10 +298,12 @@ ngx_http_websocket_stat_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
             ctx->ws_conn_start_time = ngx_time();
         } else {
             ngx_atomic_fetch_add(&ngx_websocket_stat_active, -1);
-            char *log_line =
-                apply_template(log_close_template, r, &template_ctx);
-            websocket_log(log_line);
-            free(log_line);
+            if (ws_log) {
+                char *log_line =
+                    apply_template(log_close_template, r, &template_ctx);
+                websocket_log(log_line);
+                free(log_line);
+            }
         }
     }
 
