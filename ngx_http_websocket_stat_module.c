@@ -116,7 +116,7 @@ static u_char responce_template[] =
     "data\n"
     "%lu %lu %lu\n";
 
-u_char msg[sizeof(responce_template) + 3 * NGX_ATOMIC_T_LEN];
+u_char msg[sizeof(responce_template) + 6 * NGX_ATOMIC_T_LEN];
 
 static ngx_int_t
 ngx_http_websocket_stat_handler(ngx_http_request_t *r)
