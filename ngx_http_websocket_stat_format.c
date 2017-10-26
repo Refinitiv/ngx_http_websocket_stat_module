@@ -1,7 +1,7 @@
 #include <assert.h>
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
 
 #include "ngx_http_websocket_stat_format.h"
 
@@ -222,16 +222,14 @@ const char *http_header_var(ngx_http_request_t *r, void *data) {
   return "???";
 }
 
-compiled_template *compile_template(ngx_str_t *template,
+compiled_template *compile_template(char *template,
                                     const template_variable *variables,
                                     ngx_pool_t *pool) {
   compiled_template *templ = ngx_palloc(pool, sizeof(compiled_template));
   templ->variable_occurances =
       ngx_array_create(pool, 10, sizeof(variable_occurance *));
   templ->variables = variables;
-  templ->template = ngx_palloc(pool, template->len + 1);
-  memcpy(templ->template, template->data, template->len);
-  templ->template[template->len] = '\0';
+  templ->template = template;
   templ->pool = pool;
   find_variables(templ->template, templ);
   _compile_template(templ);

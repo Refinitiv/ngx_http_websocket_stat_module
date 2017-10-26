@@ -15,25 +15,19 @@ const template_variable variables[] = {
      test_func},
     {NULL, 0, 0, NULL}};
 
-int test_template(const char *template, const char* expected_result)
-{
-  ngx_str_t template_str;
-  template_str.data = template;
-  template_str.len = strlen(template);
+int test_template(const char *template, const char *expected_result) {
 
   compiled_template *template_cmpl =
-      compile_template(&template_str, variables, NULL);
+      compile_template(template, variables, NULL);
   char *res = apply_template(template_cmpl, NULL, NULL);
-  if (strcmp(res, expected_result) == 0)
-  {
-     printf("test passed :)\n");
-  }
-  else
-  {
-     printf("Test failed :(\n"
-            "actual  : %s\n"
-            "expected: %s\n", res, expected_result );
-     exit(1);
+  if (strcmp(res, expected_result) == 0) {
+    printf("test passed :)\n");
+  } else {
+    printf("Test failed :(\n"
+           "actual  : %s\n"
+           "expected: %s\n",
+           res, expected_result);
+    exit(1);
   }
 
   free(template_cmpl->variable_occurances->elts);
@@ -42,19 +36,14 @@ int test_template(const char *template, const char* expected_result)
 
 int main() {
   printf("test started\n");
-  test_template("Some template $ws_opcode sdkj $ws_packet_source f", 
+  test_template("Some template $ws_opcode sdkj $ws_packet_source f",
                 "Some template BINGO sdkj BINGO f");
-  test_template("Some template $ws_opcode sdkj f", 
+  test_template("Some template $ws_opcode sdkj f",
                 "Some template BINGO sdkj f");
-  test_template("Some template f", 
-                "Some template f");
-  test_template("", 
-                "");
-  test_template("$time_local", 
-                "BINGO");
-  test_template("$time_local$ws_opcode$ws_payload_size", 
-                "BINGOBINGOBINGO");
-  test_template("$time_", 
-                "$time_");
+  test_template("Some template f", "Some template f");
+  test_template("", "");
+  test_template("$time_local", "BINGO");
+  test_template("$time_local$ws_opcode$ws_payload_size", "BINGOBINGOBINGO");
+  test_template("$time_", "$time_");
   return 0;
 }
