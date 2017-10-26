@@ -8,9 +8,9 @@
 #define ngx_palloc(pool, size) malloc(size)
 
 typedef struct {
-  size_t nelts;
-  void *elts;
-  size_t el_size;
+    size_t nelts;
+    void *elts;
+    size_t el_size;
 } ngx_array_t;
 
 #else
@@ -25,21 +25,21 @@ typedef struct {
 typedef const char *(*template_op)(ngx_http_request_t *r, void *data);
 
 typedef struct {
-  char *name;
-  size_t name_len;
-  size_t len;
-  template_op operation;
+    char *name;
+    size_t name_len;
+    size_t len;
+    template_op operation;
 } template_variable;
 
 #define VAR_NAME(name) name, sizeof(name) - 1
 
 typedef struct {
-  ngx_array_t *variable_occurances;
-  char *compiled_template_str;
-  size_t max_result_len;
-  const template_variable *variables;
-  char *template;
-  ngx_pool_t *pool;
+    ngx_array_t *variable_occurances;
+    char *compiled_template_str;
+    size_t max_result_len;
+    const template_variable *variables;
+    char *template;
+    ngx_pool_t *pool;
 } compiled_template;
 
 // Public functions

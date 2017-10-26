@@ -1,0 +1,6 @@
+IndentWidth: 4
+Language: Cpp
+BreakBeforeBraces: Custom
+BraceWrapping:
+   AfterFunction: true
+AlwaysBreakAfterDefinitionReturnType : TopLevel

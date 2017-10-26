@@ -1,5 +1,7 @@
 #include <stdio.h>
-int main() {
-  printf("test started\n");
-  return 0;
+int
+main()
+{
+    printf("test started\n");
+    return 0;
 }
