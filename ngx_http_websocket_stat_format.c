@@ -75,7 +75,7 @@ locate_http_variables(compiled_template *template_cmlp)
         int pos = occurance - template_cmlp->template;
         int len = 0;
         occurance += HTTP_VAR_LEN;
-        while (islower(*occurance) || *occurance == '_' || *occurance == '-') {
+        while (islower(*occurance) || *occurance == '_') {
             occurance++;
             len++;
         }
@@ -216,15 +216,14 @@ int
 compare_hdr(const char *hdr, size_t hdr_len, const char *template)
 {
     while (hdr_len) {
-        if (*hdr == '_' && *template != ' ')
-            return 0;
-        if (tolower(*hdr) != tolower(*template))
-            return 0;
+        if (*hdr != '-' || *template != '_')
+            if (tolower(*hdr) != tolower(*template))
+                return 0;
         hdr++;
         template ++;
         hdr_len--;
     }
-    return 1;
+    return *hdr == '\0' ? 1 : 0;
 }
 
 const char *
