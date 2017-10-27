@@ -96,9 +96,11 @@ find_variables(const char *template, compiled_template *template_cmlp)
         while (1) {
             occurance = strstr(occurance, variables[i].name);
             if (occurance) {
-                insert_occurance(variables + i, occurance - template,
-                                 template_cmlp, 0);
+                int pos = occurance - template;
                 occurance += variables[i].name_len;
+                if (*occurance == '_')
+                    continue;
+                insert_occurance(variables + i, pos, template_cmlp, 0);
             } else {
                 break;
             }

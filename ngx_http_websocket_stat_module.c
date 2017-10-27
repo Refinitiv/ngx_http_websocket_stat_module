@@ -213,6 +213,7 @@ my_send(ngx_connection_t *c, u_char *buf, size_t size)
     ngx_frame_counter_t *frame_counter = &frame_counter_out;
     frame_counter->total_size += sz;
     ngx_http_request_t *r = c->data;
+
     ctx = ngx_http_get_module_ctx(r, ngx_http_websocket_stat_module);
     template_ctx_s template_ctx;
     template_ctx.counter = frame_counter;
@@ -346,6 +347,23 @@ ws_packet_source(ngx_http_request_t *r, void *data)
 }
 
 const char *
+get_core_var(ngx_http_request_t *r, const char *variable)
+{
+    ngx_int_t key = 0;
+    ngx_http_variable_value_t *vv;
+    ngx_str_t var;
+    var.data = (u_char *)variable;
+    var.len = strlen(variable);
+    while (*variable != '\0')
+        key = ngx_hash(key, *(variable++));
+
+    vv = ngx_http_get_variable(r, &var, key);
+    memcpy(buff, vv->data, vv->len);
+    buff[vv->len] = '\0';
+    return buff;
+}
+
+const char *
 ws_connection_age(ngx_http_request_t *r, void *data)
 {
     template_ctx_s *ctx = data;
@@ -371,6 +389,21 @@ remote_ip(ngx_http_request_t *r, void *data)
     return buff;
 }
 
+#define GEN_CORE_GET_FUNC(fname, var)                                          \
+    const char *fname(ngx_http_request_t *r, void *data)                       \
+    {                                                                          \
+        return get_core_var(r, var);                                           \
+    }
+
+GEN_CORE_GET_FUNC(request, "request")
+GEN_CORE_GET_FUNC(request_id, "request_id")
+GEN_CORE_GET_FUNC(uri, "uri")
+GEN_CORE_GET_FUNC(remote_user, "remote_user")
+GEN_CORE_GET_FUNC(remote_addr, "remote_addr")
+GEN_CORE_GET_FUNC(remote_port, "remote_port")
+GEN_CORE_GET_FUNC(server_addr, "server_addr")
+GEN_CORE_GET_FUNC(server_port, "server_port")
+
 const template_variable variables[] = {
     {VAR_NAME("$ws_opcode"), sizeof("ping") - 1, ws_packet_type},
     {VAR_NAME("$ws_payload_size"), NGX_SIZE_T_LEN, ws_packet_size},
@@ -378,6 +411,14 @@ const template_variable variables[] = {
     {VAR_NAME("$ws_conn_age"), NGX_SIZE_T_LEN, ws_connection_age},
     {VAR_NAME("$time_local"), sizeof("Mon, 23 Oct 2017 11:27:42 GMT") - 1,
      local_time},
+    {VAR_NAME("$request"), 60, request},
+    {VAR_NAME("$uri"), 60, uri},
+    {VAR_NAME("$request_id"), 60, request_id},
+    {VAR_NAME("$remote_user"), 60, remote_user},
+    {VAR_NAME("$remote_addr"), 60, remote_addr},
+    {VAR_NAME("$remote_port"), 60, remote_port},
+    {VAR_NAME("$server_addr"), 60, server_addr},
+    {VAR_NAME("$server_port"), 60, server_port},
     {VAR_NAME("$remote_ip"), sizeof("000.000.000.000") - 1, remote_ip},
     {NULL, 0, 0, NULL}};
 

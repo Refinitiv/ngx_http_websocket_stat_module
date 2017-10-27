@@ -15,6 +15,8 @@ const template_variable variables[] = {
     {VAR_NAME("$ws_payload_size"), 10, test_func},
     {VAR_NAME("$ws_packet_source"), sizeof("upstream") - 1, test_func},
     {VAR_NAME("$ws_conn_age"), 10, test_func},
+    {VAR_NAME("$request"), 10, test_func},
+    {VAR_NAME("$request_id"), 10, test_func},
     {VAR_NAME("$time_local"), sizeof("Mon, 23 Oct 2017 11:27:42 GMT") - 1,
      test_func},
     {NULL, 0, 0, NULL}};
@@ -53,5 +55,6 @@ main()
     test_template("$time_local", "BINGO");
     test_template("$time_local$ws_opcode$ws_payload_size", "BINGOBINGOBINGO");
     test_template("$time_", "$time_");
+    test_template("$request $request_id", "BINGO BINGO");
     return 0;
 }
