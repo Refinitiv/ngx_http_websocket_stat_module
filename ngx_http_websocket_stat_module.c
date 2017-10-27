@@ -365,7 +365,10 @@ local_time(ngx_http_request_t *r, void *data)
 const char *
 remote_ip(ngx_http_request_t *r, void *data)
 {
-    return (char *)r->connection->addr_text.data;
+    memcpy(buff, r->connection->addr_text.data, r->connection->addr_text.len);
+    buff[r->connection->addr_text.len] = '\0';
+
+    return buff;
 }
 
 const template_variable variables[] = {
