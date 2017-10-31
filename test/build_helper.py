@@ -98,7 +98,7 @@ def nginxCtl(cmd=None):
           nginxCtl("stop")
         nginxCtl()
     else:
-        print(nginx_cmd(["-s",cmd]))
+        nginx_cmd(["-s", cmd])
 
 def clearLog():
     rm_cmd(os.path.join("..", ws_log_file))
@@ -122,6 +122,7 @@ class ThisApp(cli.Application):
             make_nginx_conf(os.path.join("..", conf_file))
         else:
             print("Unknown action: {}".format(action))
+
 if __name__ == "__main__":
     ThisApp.run()
 
