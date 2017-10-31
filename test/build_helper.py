@@ -1,9 +1,21 @@
 #!/usr/bin/python3
+
 from plumbum import local 
 from plumbum import cli
+from plumbum.commands.processes import ProcessExecutionError
+from test_config import links, download_dir, conf_file, ws_backend, ws_log_file, conf_template
 import os
+import time
 
-download_dir = "../download"
+def getLinkFilename(link):
+    return link.split("/")[-1]
+
+def getLinkDir(link):
+    return os.path.join("../", getLinkFilename(link).replace(".tar.gz", ""))
+
+if local.cwd.split("/")[-1]!= "ngx_http_websocket_stat_module":
+    print("this script is supposed to be run from repo root dir")
+    exit(1)
 this_dir =  os.path.join("..", local.cwd.split("/")[-1])
 wget_cmd = local["wget"]
 untar_cmd = local["tar"]["xz", "-C", "../", "-f"]
@@ -11,20 +23,9 @@ files_cmd =  local["ls"][download_dir]
 make_cmd = local["make"]["-j4"]
 rm_cmd = local["rm"]["-rf"]
 
-links = {
-"pcre" : "ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre-8.41.tar.gz",
-"zlib" : "http://zlib.net/zlib-1.2.11.tar.gz",
-"openssl": "http://www.openssl.org/source/openssl-1.0.2k.tar.gz",
-"nginx": "http://nginx.org/download/nginx-1.13.5.tar.gz"
-}
 
-ws_backend = "http://brokerstats-test.financial.com/streaming"
-
-def getLinkFilename(link):
-    return link.split("/")[-1]
-
-def getLinkDir(link):
-    return os.path.join("../", getLinkFilename(link).replace(".tar.gz", ""))
+nginx_dir = getLinkDir(links["nginx"])
+nginx_cmd = local[os.path.join(nginx_dir, "objs/nginx")]["-p", "..", "-c", conf_file]
 
 def download(links):
     local["mkdir"]["-p", os.path.join("..", download_dir)]
@@ -64,10 +65,11 @@ def make_nginx(links):
     local.cwd.chdir(nginx_dir)
     conf_cmd = local["./configure"]["--with-pcre=" + getLinkDir(links["pcre"]),
                     "--with-zlib=" + getLinkDir(links["zlib"]),
+                    "--with-http_stub_status_module",
                     "--with-openssl=" + getLinkDir(links["openssl"]),
                     "--add-module="+this_dir
                     ]
-    print("Configuring {}".format( conf_cmd))
+    print("Configuring {}".format(conf_cmd))
     conf_cmd()
     print("Building")
     make_cmd()
@@ -78,32 +80,30 @@ def clean(links):
     rm_cmd(dirs)
 
 def make_nginx_conf(filename):
-    conf = """
-events
-{{
-   worker_connections 4096;
-}}
-
-http
-{{
-   server
-   {{
-      ws_log logs/websocket.log;
-      listen 8080;
-      location /stat {{
-         ws_stat;
-      }}
-      location /streaming {{
-         proxy_pass {backend};
-         proxy_set_header Upgrade $http_upgrade;
-      }}
-   }}
-
-}}
-"""
     with open(filename, "w") as f:
-        f.write(conf.format(backend=ws_backend))
+        f.write(conf_template.format(backend=ws_backend, log=ws_log_file))
 
+def isNginxRunning():
+    try:
+      local["pgrep"]["nginx"]()
+    except ProcessExecutionError:
+      return False
+    return True
+
+def nginxCtl(cmd=None):
+    if cmd is None:
+        nginx_cmd()
+    elif cmd == "restart":
+        if (isNginxRunning()):
+          nginxCtl("stop")
+        nginxCtl()
+    else:
+        print(nginx_cmd(["-s",cmd]))
+
+def clearLog():
+    rm_cmd(os.path.join("..", ws_log_file))
+
+    
 class ThisApp(cli.Application):
     def main(self, action):
         if action == "clean":
@@ -119,8 +119,9 @@ class ThisApp(cli.Application):
             make_nginx(links)
         elif action == "conf":
             print("Configuring nginx...")
-            make_nginx_conf("../nginx.conf")
+            make_nginx_conf(os.path.join("..", conf_file))
         else:
             print("Unknown action: {}".format(action))
-ThisApp.run()
+if __name__ == "__main__":
+    ThisApp.run()
 
