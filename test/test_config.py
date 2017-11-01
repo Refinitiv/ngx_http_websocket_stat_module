@@ -9,7 +9,9 @@ links = {
 "nginx": "http://nginx.org/download/nginx-1.13.5.tar.gz"
 }
 ws_backend = "http://brokerstats-test.financial.com/streaming"
+ws_backend = "http://127.0.0.1:5000/streaming"
 ws_log_file = "logs/websocket.log"
+proxy_port = 8080
 conf_template = """
 events
 {{
@@ -22,7 +24,7 @@ http
    {{
       ws_log {log};
       ws_log_format "$time_local: $request_id packet from $ws_packet_source payload: $ws_payload_size";
-      listen 8080;
+      listen {port};
       location /stat {{
          ws_stat;
       }}
@@ -32,6 +34,8 @@ http
       location /streaming {{
          proxy_pass {backend};
          proxy_set_header Upgrade $http_upgrade;
+         proxy_set_header Connection "keep-alive, Upgrade";
+         proxy_http_version 1.1;                           
       }}
    }}
 

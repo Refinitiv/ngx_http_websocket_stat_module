@@ -2,6 +2,7 @@
 from plumbum import cli
 from plumbum import local 
 from plumbum import BG
+from plumbum.commands.processes import ProcessExecutionError
 import threading
 import http.client
 import time
@@ -71,12 +72,17 @@ class RequestThread(threading.Thread):
             self.startHTTPConnection()
 
 def parseLogs(logfile):
-    chain = local["cat"][logfile] | local["grep"] ["packet from client"] | local["wc"]["-l"]
-    frames = int(chain())
-    chain = local["cat"][logfile] | local["grep"] ["packet from client"] | \
-            local["sed"]["-n", 's/.*payload: \\(.*\\)/\\1/p'] | local["paste"]["-sd+"] | local["bc"]
-    payload = int(chain())
-    return frames, payload
+    try:
+        chain = local["cat"][logfile] | local["grep"] ["packet from client"] | local["wc"]["-l"]
+        frames = int(chain())
+        chain = local["cat"][logfile] | local["grep"] ["packet from client"] | \
+                local["sed"]["-n", 's/.*payload: \\(.*\\)/\\1/p'] | local["paste"]["-sd+"] | local["bc"]
+        payload = int(chain())
+        return frames, payload
+    except ProcessExecutionError as e:
+        logger.error("Error parsing log files:\n{}".format(e))
+        return 0,0
+
 
 def ws_stat(host):
     try:
@@ -89,13 +95,17 @@ def ws_stat(host):
         return None
 
 def parseStat(host):
-    data = ws_stat(host)
-    data = data.split('\n')
-    cons = data[0].split()[2]
-    instat_line = data[2].split()
-    frames = instat_line[0]
-    payload = instat_line[1]
-    return  cons, frames, payload
+    try:
+        data = ws_stat(host)
+        data = data.split('\n')
+        cons = data[0].split()[2]
+        instat_line = data[2].split()
+        frames = instat_line[0]
+        payload = instat_line[1]
+        return  cons, frames, payload
+    except IndexError: 
+        logger.info("Wrong data: {}".format(data))
+        return 0,0,0
 
 result_exp = re.compile("Total frames: (\d+), total bytes: (\d+)")
 class TestApp(cli.Application):

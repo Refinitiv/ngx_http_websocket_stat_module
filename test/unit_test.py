@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 import unittest
-from plumbum import local
+from plumbum import local, cli, BG
 
 class TestWebStat(unittest.TestCase):
     def regularCheck(self, sent_frames, sent_payload, 
@@ -58,6 +58,25 @@ class TestWebStat(unittest.TestCase):
                        ]
         self.regularCheck(*[int(x) for x in self_run_cmd().split()])
 
+    def testLargePackets(self):
+        self_run_cmd = local['test/ws_test.py'] \
+                       [
+                       "-h", "10.24.9.13:8080", 
+                       "-w",
+                       "--fps", 3,
+                       "--seconds", 30,
+                       "--connections", 5,
+                       "--packet", 3000,
+                       "--instances", 100,
+                       "--robot_friendly"
+                       ]
+        self.regularCheck(*[int(x) for x in self_run_cmd().split()])
+
 if __name__ == "__main__":
-    unittest.main()
+    f = local["test/test_server.py"] & BG
+    try:
+        unittest.main()
+    finally:
+        f.proc.kill()
+
 

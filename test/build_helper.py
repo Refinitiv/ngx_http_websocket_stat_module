@@ -3,7 +3,9 @@
 from plumbum import local 
 from plumbum import cli
 from plumbum.commands.processes import ProcessExecutionError
-from test_config import links, download_dir, conf_file, ws_backend, ws_log_file, conf_template
+from test_config import links, download_dir, \
+                        conf_file, ws_backend, \
+                        ws_log_file, conf_template, proxy_port
 import os
 import time
 
@@ -81,7 +83,11 @@ def clean(links):
 
 def make_nginx_conf(filename):
     with open(filename, "w") as f:
-        f.write(conf_template.format(backend=ws_backend, log=ws_log_file))
+        f.write(conf_template.format(
+                backend = ws_backend, 
+                log = ws_log_file,
+                port = proxy_port
+                ))
 
 def isNginxRunning():
     try:
