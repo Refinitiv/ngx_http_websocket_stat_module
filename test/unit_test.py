@@ -1,6 +1,28 @@
 #!/usr/bin/python3
 import unittest
 from plumbum import local, cli, BG
+from plumbum.commands.processes import ProcessExecutionError
+
+build_hlpr_cmd = local["test/build_helper.py"]
+
+def getNginxPID():
+    chain = local["pgrep"]["nginx"] | local["tail"]["-n1"]
+    pid = int(chain())
+    return pid
+
+def startNginx():
+    try:
+        local["pkill"]["-9", "nginx"]()
+    except ProcessExecutionError:
+        pass
+    build_hlpr_cmd("conf")
+    build_hlpr_cmd("start_nginx")
+    return getNginxPID()
+
+def getTotalMem(pid):
+    chain = local["pmap"][pid] | local["sed"]["-n", 's/total\\ *\\(.*\\)/\\1/p']
+    out = chain()
+    return (int(out.replace('K','')))
 
 class TestWebStat(unittest.TestCase):
     def regularCheck(self, sent_frames, sent_payload, 
@@ -72,11 +94,31 @@ class TestWebStat(unittest.TestCase):
                        ]
         self.regularCheck(*[int(x) for x in self_run_cmd().split()])
 
+    def testMemoryLeak(self):
+        pid = startNginx()
+        memory = local["pmap"]
+        memBefore = getTotalMem(pid)
+        self_run_cmd = local['test/ws_test.py'] \
+                       [
+                       "-h", "10.24.9.13:8080", 
+                       "-w",
+                       "--fps", 3,
+                       "--seconds", 60,
+                       "--connections", 5,
+                       "--packet", 3000,
+                       "--instances", 100,
+                       "--robot_friendly",
+                       "--keepNginx"
+                       ]
+        self.regularCheck(*[int(x) for x in self_run_cmd().split()])
+        self.assertEqual(pid, getNginxPID())
+        memAfter = getTotalMem(pid)
+        self.assertTrue(memAfter - memBefore <= 4)
+
 if __name__ == "__main__":
     f = local["test/test_server.py"] & BG
     try:
         unittest.main()
     finally:
         f.proc.kill()
-
 

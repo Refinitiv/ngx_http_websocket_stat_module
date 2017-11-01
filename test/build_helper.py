@@ -5,7 +5,8 @@ from plumbum import cli
 from plumbum.commands.processes import ProcessExecutionError
 from test_config import links, download_dir, \
                         conf_file, ws_backend, \
-                        ws_log_file, conf_template, proxy_port
+                        ws_log_file, conf_template, proxy_port, \
+                        workers
 import os
 import time
 
@@ -86,7 +87,8 @@ def make_nginx_conf(filename):
         f.write(conf_template.format(
                 backend = ws_backend, 
                 log = ws_log_file,
-                port = proxy_port
+                port = proxy_port,
+                workers = workers
                 ))
 
 def isNginxRunning():
@@ -126,6 +128,9 @@ class ThisApp(cli.Application):
         elif action == "conf":
             print("Configuring nginx...")
             make_nginx_conf(os.path.join("..", conf_file))
+        elif action == "start_nginx":
+            clearLog()
+            nginxCtl()
         else:
             print("Unknown action: {}".format(action))
 

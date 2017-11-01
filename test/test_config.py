@@ -8,15 +8,20 @@ links = {
 "openssl": "http://www.openssl.org/source/openssl-1.0.2k.tar.gz",
 "nginx": "http://nginx.org/download/nginx-1.13.5.tar.gz"
 }
+
 ws_backend = "http://brokerstats-test.financial.com/streaming"
 ws_backend = "http://127.0.0.1:5000/streaming"
 ws_log_file = "logs/websocket.log"
 proxy_port = 8080
+workers = 1
+
 conf_template = """
 events
 {{
    worker_connections 4096;
 }}
+
+worker_processes  {workers};
 
 http
 {{
