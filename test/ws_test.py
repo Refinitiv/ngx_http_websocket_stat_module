@@ -113,21 +113,22 @@ class TestApp(cli.Application):
     connections = cli.SwitchAttr(['-c', '--connections'], int, default = 1) 
     host = cli.SwitchAttr(['-h', '--host'], str, default = '10.24.9.13') 
     websocket = cli.Flag(['-w', '--websocket']) 
-    slave = cli.Flag(['--slave']) 
+    worker = cli.Flag(['--worker']) 
     fps = cli.SwitchAttr(['-f', '--fps'], int, default = 1)
     seconds = cli.SwitchAttr(['-s', '--seconds'], int, default = 3)
     instances = cli.SwitchAttr(['-n','--instances'], int, default = 1)
     packet_size = cli.SwitchAttr(['-p', '--packet'], int, default = 10)
     robot_friendly = cli.Flag(['--robot_friendly'])
     keepNginx = cli.Flag(['--keepNginx'])
+
     def main(self):
-        if not self.slave:
+        if not self.worker:
             make_nginx_conf(os.path.join("..", conf_file))
             if (not self.keepNginx):
                 clearLog()
                 nginxCtl("restart")
             self_run_cmd = local['test/ws_test.py']["-h",self.host, 
-                           "--slave","-w",
+                           "--worker","-w",
                            "--fps", self.fps,
                            "--seconds", self.seconds,
                            "--connections", self.connections,

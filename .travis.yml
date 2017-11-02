@@ -1,0 +1,25 @@
+language: python
+dist: trusty
+sudo: false
+
+python:
+ - "3.5"
+
+install:
+ - pip3 install plumbum
+ - pip3 install websocket
+ - pip3 install websockets
+ - pip3 install asyncio
+
+before_script:
+ - test/build_helper.py build
+
+script:
+ - test/unit_test.py
+
+acter_success:
+ - coveralls
+
+notifications:
+   email:
+      dmytro.rezchykov@thomsonreuters.com
