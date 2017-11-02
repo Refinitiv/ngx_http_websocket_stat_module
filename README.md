@@ -40,7 +40,7 @@ To read websocket statistic there is GET request should be set up at "location" 
 
 ## Example of configuration
 
-'''
+```
 
 server
 {
@@ -55,7 +55,5 @@ server
    ...
 }
 
-
-'''
-
+```
 
