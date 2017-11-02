@@ -48,7 +48,7 @@ To read websocket statistic there is GET request should be set up at "location" 
 server
 {
    ws_log <path/to/logfile>;
-   ws_log_format "";
+   ws_log_format "$local_time: packet of type $ws_opcode received from $ws_packet_source, packet size is $ws_payload_size";
    ws_log_format open "$local_time: Connection opened";
    ws_log_format close "$local_time: Connection closed";
 # set up location for statistic 
