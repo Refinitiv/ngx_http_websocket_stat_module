@@ -5,13 +5,16 @@ Nginx module developed for logging and displaying statistic of websocket proxy c
 ## Installation
 
    1. Configure nginx adding this module with:
-          
+   ```sh
           ./configure (...) --add-module=./ngx_http_websocket_stat_module
-       
+   ```
    2. Build nginx with make -j<n> command where n is number of cpu cores on your build machine
    
    Alternatively could be used build script shipped along with module:
-   From module directory run "test/build_helper.py build"
+   From module directory run 
+   ```sh
+   test/build_helper.py build
+   ```
    It would download and build nginx and all required libraries (openssl, pcre and zlib) and generate nginx configuration file.
 
 ## Usage
