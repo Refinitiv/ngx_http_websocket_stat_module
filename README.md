@@ -1,4 +1,4 @@
-# NGINX module showing websocket connection and traffic statistics
+# NGINX module websocket connection and traffic statistics
 
 Nginx module developed for logging and displaying statistic of websocket proxy connections traffic. 
 
@@ -39,7 +39,9 @@ Here is a list of variables you can use in log format string:
 To read websocket statistic there is GET request should be set up at "location" location of nginx config file with ws_stat command in it. Look into example section for details.
 
 ## Example of configuration
+
 '''
+
 server
 {
    ws_log <path/to/logfile>;
@@ -52,5 +54,8 @@ server
    }
    ...
 }
+
+
 '''
+
 
