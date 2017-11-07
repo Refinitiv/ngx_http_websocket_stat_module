@@ -13,10 +13,10 @@ install:
  - pip3 install asyncio
 
 before_script:
- - test/build_helper.py build
+ - python3 test/build_helper.py build
 
 script:
- - test/unit_test.py
+ - python333 test/unit_test.py
 
 notifications:
    email:
