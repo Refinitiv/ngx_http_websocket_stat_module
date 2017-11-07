@@ -1,5 +1,7 @@
+import os
 
-download_dir = "../download"
+ngx_dir = "nginx"
+download_dir = os.path.join(ngx_dir, "download")
 conf_file = "nginx.conf"
 
 links = {

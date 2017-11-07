@@ -11,7 +11,7 @@ from websocket import create_connection
 from functools import reduce
 import operator
 from build_helper import nginxCtl, clearLog, make_nginx_conf
-from test_config import ws_log_file, conf_file
+from test_config import ws_log_file, conf_file, ngx_dir
 import logging
 import os
 import sys
@@ -123,7 +123,7 @@ class TestApp(cli.Application):
 
     def main(self):
         if not self.worker:
-            make_nginx_conf(os.path.join("..", conf_file))
+            make_nginx_conf(os.path.join(ngx_dir, conf_file))
             if (not self.keepNginx):
                 clearLog()
                 nginxCtl("restart")
@@ -153,7 +153,7 @@ class TestApp(cli.Application):
                     total_payload += int(payload)
             logger.info("Parcing log files...")
             webstat = parseStat(self.host)
-            parced_frames, parced_payload = parseLogs(os.path.join("..", ws_log_file)) 
+            parced_frames, parced_payload = parseLogs(os.path.join(ngx_dir, ws_log_file))
             if self.robot_friendly:
                 print("{} {} {} {} {} {} {}".format(total_frames, total_payload, parced_frames, parced_payload, *webstat))
             else:

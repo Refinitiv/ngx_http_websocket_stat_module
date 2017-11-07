@@ -51,7 +51,6 @@ class TestWebStat(unittest.TestCase):
                        ]
         self.regularCheck(*[int(x) for x in self_run_cmd().split()])
 
-
     def test500Cons(self):
         self_run_cmd = local["python3"]['test/ws_test.py'] \
                        [

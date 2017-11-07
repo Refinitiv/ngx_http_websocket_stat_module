@@ -3,35 +3,37 @@
 from plumbum import local 
 from plumbum import cli
 from plumbum.commands.processes import ProcessExecutionError
-from test_config import links, download_dir, \
+from test_config import links, download_dir, ngx_dir, \
                         conf_file, ws_backend, \
                         ws_log_file, conf_template, proxy_port, \
                         workers
 import os
 import time
 
+mkdir_cmd = local["mkdir"]["-p"]
+
 def getLinkFilename(link):
     return link.split("/")[-1]
 
 def getLinkDir(link):
-    return os.path.join("../", getLinkFilename(link).replace(".tar.gz", ""))
+    return os.path.join(ngx_dir, getLinkFilename(link).replace(".tar.gz", ""))
 
 if local.cwd.split("/")[-1]!= "ngx_http_websocket_stat_module":
     print("this script is supposed to be run from repo root dir")
     exit(1)
-this_dir =  os.path.join("..", local.cwd.split("/")[-1])
+this_dir =  "../.."
 wget_cmd = local["wget"]
-untar_cmd = local["tar"]["xz", "-C", "../", "-f"]
+untar_cmd = local["tar"]["xz", "-C", ngx_dir, "-f"]
 files_cmd =  local["ls"][download_dir]
 make_cmd = local["make"]["-j4"]
 rm_cmd = local["rm"]["-rf"]
 
 
 nginx_dir = getLinkDir(links["nginx"])
-nginx_cmd = local[os.path.join(nginx_dir, "objs/nginx")]["-p", "..", "-c", conf_file]
+nginx_cmd = local[os.path.join(nginx_dir, "objs/nginx")]["-p", ngx_dir, "-c", conf_file]
 
 def download(links):
-    local["mkdir"]["-p", os.path.join("..", download_dir)]
+    mkdir_cmd(download_dir)
     for lib in links: 
        link = links[lib]
        filename = getLinkFilename(link)
@@ -60,16 +62,16 @@ def make(links):
        else:
            local["./configure"]()
        make_cmd()
-    local.cwd.chdir(this_dir)
+       local.cwd.chdir(this_dir)
 
 def make_nginx(links):
     nginx_fn = getLinkFilename(links["nginx"])
     nginx_dir = getLinkDir(links["nginx"])
     local.cwd.chdir(nginx_dir)
-    conf_cmd = local["./configure"]["--with-pcre=" + getLinkDir(links["pcre"]),
-                    "--with-zlib=" + getLinkDir(links["zlib"]),
+    conf_cmd = local["./configure"]["--with-pcre=" + os.path.join(this_dir, getLinkDir(links["pcre"])),
+                    "--with-zlib=" + os.path.join(this_dir, getLinkDir(links["zlib"])),
                     "--with-http_stub_status_module",
-                    "--with-openssl=" + getLinkDir(links["openssl"]),
+                    "--with-openssl=" + os.path.join(this_dir, getLinkDir(links["openssl"])),
                     "--add-module="+this_dir
                     ]
     print("Configuring {}".format(conf_cmd))
@@ -104,13 +106,13 @@ def nginxCtl(cmd=None):
     elif cmd == "restart":
         if (isNginxRunning()):
           nginxCtl("stop")
+        mkdir_cmd(os.path.join(ngx_dir, "logs"))
         nginxCtl()
     else:
         nginx_cmd(["-s", cmd])
 
 def clearLog():
-    rm_cmd(os.path.join("..", ws_log_file))
-
+    rm_cmd(os.path.join(ngx_dir, ws_log_file))
     
 class ThisApp(cli.Application):
     def main(self, action):
@@ -127,7 +129,7 @@ class ThisApp(cli.Application):
             make_nginx(links)
         elif action == "conf":
             print("Configuring nginx...")
-            make_nginx_conf(os.path.join("..", conf_file))
+            make_nginx_conf(conf_file)
         elif action == "start_nginx":
             clearLog()
             nginxCtl()
