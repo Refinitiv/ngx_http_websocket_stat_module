@@ -3,7 +3,7 @@ import unittest
 from plumbum import local, cli, BG
 from plumbum.commands.processes import ProcessExecutionError
 
-build_hlpr_cmd = local["test/build_helper.py"]
+build_hlpr_cmd = local["python3"]["test/build_helper.py"]
 
 def getNginxPID():
     chain = local["pgrep"]["nginx"] | local["tail"]["-n1"]
@@ -38,7 +38,7 @@ class TestWebStat(unittest.TestCase):
         self.assertEqual(connections, 0)
     
     def testSimple(self):
-        self_run_cmd = local['test/ws_test.py'] \
+        self_run_cmd = local["python3"]['test/ws_test.py'] \
                        [
                        "-h", "127.0.0.1:8080",
                        "-w",
@@ -53,7 +53,7 @@ class TestWebStat(unittest.TestCase):
 
 
     def test500Cons(self):
-        self_run_cmd = local['test/ws_test.py'] \
+        self_run_cmd = local["python3"]['test/ws_test.py'] \
                        [
                        "-h", "127.0.0.1:8080",
                        "-w",
@@ -67,7 +67,7 @@ class TestWebStat(unittest.TestCase):
         self.regularCheck(*[int(x) for x in self_run_cmd().split()])
 
     def testLongRun500Cons(self):
-        self_run_cmd = local['test/ws_test.py'] \
+        self_run_cmd = local["python3"]['test/ws_test.py'] \
                        [
                        "-h", "127.0.0.1:8080",
                        "-w",
@@ -81,7 +81,7 @@ class TestWebStat(unittest.TestCase):
         self.regularCheck(*[int(x) for x in self_run_cmd().split()])
 
     def testLargePackets(self):
-        self_run_cmd = local['test/ws_test.py'] \
+        self_run_cmd = local["python3"]['test/ws_test.py'] \
                        [
                        "-h", "127.0.0.1:8080",
                        "-w",
@@ -98,7 +98,7 @@ class TestWebStat(unittest.TestCase):
         pid = startNginx()
         memory = local["pmap"]
         memBefore = getTotalMem(pid)
-        self_run_cmd = local['test/ws_test.py'] \
+        self_run_cmd = local["python3"]['test/ws_test.py'] \
                        [
                        "-h", "127.0.0.1:8080",
                        "-w",
@@ -116,7 +116,7 @@ class TestWebStat(unittest.TestCase):
         self.assertTrue(memAfter - memBefore <= 4)
 
 if __name__ == "__main__":
-    f = local["test/test_server.py"] & BG
+    f = local["python3"]["test/test_server.py"] & BG
     try:
         unittest.main()
     finally:

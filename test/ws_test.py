@@ -127,7 +127,7 @@ class TestApp(cli.Application):
             if (not self.keepNginx):
                 clearLog()
                 nginxCtl("restart")
-            self_run_cmd = local['test/ws_test.py']["-h",self.host, 
+            self_run_cmd = local['python3']['test/ws_test.py']["-h",self.host, 
                            "--worker","-w",
                            "--fps", self.fps,
                            "--seconds", self.seconds,
