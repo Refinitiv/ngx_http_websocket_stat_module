@@ -111,7 +111,7 @@ result_exp = re.compile("Total frames: (\d+), total bytes: (\d+)")
 class TestApp(cli.Application):
     
     connections = cli.SwitchAttr(['-c', '--connections'], int, default = 1) 
-    host = cli.SwitchAttr(['-h', '--host'], str, default = '10.24.9.13') 
+    host = cli.SwitchAttr(['-h', '--host'], str, default = '127.0.0.1')
     websocket = cli.Flag(['-w', '--websocket']) 
     worker = cli.Flag(['--worker']) 
     fps = cli.SwitchAttr(['-f', '--fps'], int, default = 1)

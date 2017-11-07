@@ -419,7 +419,7 @@ const template_variable variables[] = {
     {VAR_NAME("$remote_port"), 60, remote_port},
     {VAR_NAME("$server_addr"), 60, server_addr},
     {VAR_NAME("$server_port"), 60, server_port},
-    // TODO: Delete this since its duplicating $remote_add 
+    // TODO: Delete this since its duplicating $remote_add
     {VAR_NAME("$remote_ip"), sizeof("000.000.000.000") - 1, remote_ip},
     {NULL, 0, 0, NULL}};
 

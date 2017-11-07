@@ -40,7 +40,7 @@ class TestWebStat(unittest.TestCase):
     def testSimple(self):
         self_run_cmd = local['test/ws_test.py'] \
                        [
-                       "-h", "10.24.9.13:8080", 
+                       "-h", "127.0.0.1:8080",
                        "-w",
                        "--fps", 3,
                        "--seconds", 1,
@@ -55,7 +55,7 @@ class TestWebStat(unittest.TestCase):
     def test500Cons(self):
         self_run_cmd = local['test/ws_test.py'] \
                        [
-                       "-h", "10.24.9.13:8080", 
+                       "-h", "127.0.0.1:8080",
                        "-w",
                        "--fps", 3,
                        "--seconds", 5,
@@ -69,7 +69,7 @@ class TestWebStat(unittest.TestCase):
     def testLongRun500Cons(self):
         self_run_cmd = local['test/ws_test.py'] \
                        [
-                       "-h", "10.24.9.13:8080", 
+                       "-h", "127.0.0.1:8080",
                        "-w",
                        "--fps", 3,
                        "--seconds", 60,
@@ -83,7 +83,7 @@ class TestWebStat(unittest.TestCase):
     def testLargePackets(self):
         self_run_cmd = local['test/ws_test.py'] \
                        [
-                       "-h", "10.24.9.13:8080", 
+                       "-h", "127.0.0.1:8080",
                        "-w",
                        "--fps", 3,
                        "--seconds", 30,
@@ -100,7 +100,7 @@ class TestWebStat(unittest.TestCase):
         memBefore = getTotalMem(pid)
         self_run_cmd = local['test/ws_test.py'] \
                        [
-                       "-h", "10.24.9.13:8080", 
+                       "-h", "127.0.0.1:8080",
                        "-w",
                        "--fps", 3,
                        "--seconds", 60,
