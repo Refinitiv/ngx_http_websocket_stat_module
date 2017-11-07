@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+!/usr/bin/python3
 import unittest
 from plumbum import local, cli, BG
 from plumbum.commands.processes import ProcessExecutionError
@@ -116,8 +116,12 @@ class TestWebStat(unittest.TestCase):
         self_run_cmd()
         self.assertEqual(pid, getNginxPID())
         memAfter = getTotalMem(pid)
-        print("Mem before: {}, Mem after: {}".format(memBefore, memAfter))
-        self.assertTrue(memAfter - memBefore <= 4)
+        self_run_cmd()
+        self.assertEqual(pid, getNginxPID())
+        mem2ndRun = getTotalMem(pid)
+        print("Mem before: {}, Mem after: {}, mem2ndrun: {}".format(memBefore, memAfter, mem2ndRun))
+        self.assertTrue(memAfter - memBefore <= 24)
+        self.assertEqual(memAfter, mem2ndRun)
 
 if __name__ == "__main__":
     f = local["python3"]["test/test_server.py"] & BG
