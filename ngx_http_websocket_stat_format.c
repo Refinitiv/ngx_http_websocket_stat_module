@@ -117,8 +117,8 @@ estimate_size(compiled_template *template_cmpl)
 {
     size_t orig_size = strlen(template_cmpl->template);
     int size_dif = 0;
-    for (unsigned int i = 0; i < template_cmpl->variable_occurances->nelts;
-         i++) {
+    unsigned int i;
+    for (i = 0; i < template_cmpl->variable_occurances->nelts; i++) {
         variable_occurance *occ =
             ((variable_occurance **)
                  template_cmpl->variable_occurances->elts)[i];
@@ -149,8 +149,8 @@ _compile_template(compiled_template *template_cmpl)
     const char *template_ptr = template_cmpl->template;
     size_t template_len = strlen(template_cmpl->template);
 
-    for (unsigned int i = 0; i < template_cmpl->variable_occurances->nelts;
-         i++) {
+    unsigned int i;
+    for (i = 0; i < template_cmpl->variable_occurances->nelts; i++) {
         variable_occurance *occ =
             ((variable_occurance **)
                  template_cmpl->variable_occurances->elts)[i];
@@ -192,8 +192,8 @@ apply_template(compiled_template *template_cmpl, ngx_http_request_t *r,
 {
     char *result = malloc(strlen(template_cmpl->compiled_template_str) + 1);
     strcpy(result, template_cmpl->compiled_template_str);
-    for (unsigned int i = 0; i < template_cmpl->variable_occurances->nelts;
-         i++) {
+    unsigned int i;
+    for (i = 0; i < template_cmpl->variable_occurances->nelts; i++) {
         variable_occurance *occ =
             ((variable_occurance **)
                  template_cmpl->variable_occurances->elts)[i];
