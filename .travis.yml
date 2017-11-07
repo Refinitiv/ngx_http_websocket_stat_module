@@ -8,7 +8,7 @@ env:
 
 install:
  - pip3 install plumbum
- - pip3 install websocket
+ - pip3 install websocket-client
  - pip3 install websockets
  - pip3 install asyncio
 
