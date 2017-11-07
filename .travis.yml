@@ -1,9 +1,10 @@
 language: python
 dist: trusty
-sudo: true
 
 python:
  - "3.5"
+env:
+ - TOXENV=py35
 
 install:
  - pip3 install plumbum
@@ -16,9 +17,6 @@ before_script:
 
 script:
  - test/unit_test.py
-
-acter_success:
- - coveralls
 
 notifications:
    email:
