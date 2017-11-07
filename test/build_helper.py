@@ -102,11 +102,11 @@ def isNginxRunning():
 
 def nginxCtl(cmd=None):
     if cmd is None:
+        mkdir_cmd(os.path.join(ngx_dir, "logs"))
         nginx_cmd()
     elif cmd == "restart":
         if (isNginxRunning()):
           nginxCtl("stop")
-        mkdir_cmd(os.path.join(ngx_dir, "logs"))
         nginxCtl()
     else:
         nginx_cmd(["-s", cmd])
@@ -129,7 +129,7 @@ class ThisApp(cli.Application):
             make_nginx(links)
         elif action == "conf":
             print("Configuring nginx...")
-            make_nginx_conf(conf_file)
+            make_nginx_conf(os.path.join(ngx_dir, conf_file))
         elif action == "start_nginx":
             clearLog()
             nginxCtl()
