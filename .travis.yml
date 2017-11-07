@@ -16,7 +16,7 @@ before_script:
  - python3 test/build_helper.py build
 
 script:
- - python333 test/unit_test.py
+ - python3 test/unit_test.py
 
 notifications:
    email:
