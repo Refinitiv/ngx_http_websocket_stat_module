@@ -113,10 +113,10 @@ class TestWebStat(unittest.TestCase):
                        "--robot_friendly",
                        "--keepNginx"
                        ]
+        self_run_cmd()
         self.assertEqual(pid, getNginxPID())
         memAfter = getTotalMem(pid)
         print("Mem before: {}, Mem after: {}".format(memBefore, memAfter))
-        self.regularCheck(*[int(x) for x in self_run_cmd().split()])
         self.assertTrue(memAfter - memBefore <= 4)
 
 if __name__ == "__main__":
