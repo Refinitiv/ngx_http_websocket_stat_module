@@ -72,8 +72,8 @@ frame_counter_process_message(u_char **buffer, ssize_t *size,
                 assert(*size >= 2);
                 i = 2;
             } else {
-                assert(*size >= 4);
-                i = 4;
+                assert(*size >= 8);
+                i = 8;
             }
             while (1) {
                 frame_counter->current_payload_size |= **buffer;

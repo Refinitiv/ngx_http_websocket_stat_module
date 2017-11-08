@@ -84,10 +84,10 @@ class TestWebStat(unittest.TestCase):
                        [
                        "-h", "127.0.0.1:8080",
                        "-w",
-                       "--fps", 3,
-                       "--seconds", 30,
+                       "--fps", 1,
+                       "--seconds", 10,
                        "--connections", 5,
-                       "--packet", 5000,
+                       "--packet", 10000,
                        "--instances", 100,
                        "--robot_friendly"
                        ]

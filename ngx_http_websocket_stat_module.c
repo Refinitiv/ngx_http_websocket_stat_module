@@ -239,7 +239,19 @@ my_send(ngx_connection_t *c, u_char *buf, size_t size)
             free(log_line);
         }
     }
-    return orig_send(c, buf, size);
+    int n = orig_send(c, buf, size);
+    if (n < 0) {
+
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "WTF send");
+        ngx_atomic_fetch_add(&ngx_websocket_stat_active, -1);
+        if (ws_log) {
+            char *log_line =
+                apply_template(log_close_template, r, &template_ctx);
+            websocket_log(log_line);
+            free(log_line);
+        }
+    }
+    return n;
 }
 
 // Packets received from a client
@@ -248,6 +260,8 @@ my_recv(ngx_connection_t *c, u_char *buf, size_t size)
 {
 
     int n = orig_recv(c, buf, size);
+    if (n < 0)
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "WTF");
 
     ngx_http_websocket_stat_ctx *ctx;
     ssize_t sz = n;
@@ -258,6 +272,7 @@ my_recv(ngx_connection_t *c, u_char *buf, size_t size)
     template_ctx_s template_ctx;
     template_ctx.from_client = 1;
     template_ctx.ws_ctx = ctx;
+    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "size: %d", sz);
     while (sz > 0) {
         if (frame_counter_process_message(&buf, &sz, &ctx->frame_counter)) {
             frame_counter->frames++;
