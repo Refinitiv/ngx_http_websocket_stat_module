@@ -7,14 +7,24 @@
 
 typedef struct {
     time_t ws_conn_start_time;
+    ngx_frame_counter_t frame_counter;
+
 } ngx_http_websocket_stat_ctx;
+
+typedef struct {
+    ngx_int_t frames;
+    ngx_int_t total_payload_size;
+    ngx_int_t total_size;
+} ngx_http_websocket_stat_statistic_t;
+
+ngx_http_websocket_stat_statistic_t frames_in;
+ngx_http_websocket_stat_statistic_t frames_out;
 
 ngx_frame_counter_t frame_counter_in;
 ngx_frame_counter_t frame_counter_out;
 
 ngx_http_websocket_stat_ctx *stat_counter;
 typedef struct {
-    ngx_frame_counter_t *counter;
     int from_client;
     ngx_http_websocket_stat_ctx *ws_ctx;
 
@@ -137,9 +147,9 @@ ngx_http_websocket_stat_handler(ngx_http_request_t *r)
     out.buf = b;
     out.next = NULL;
     sprintf((char *)msg, (char *)responce_template, ngx_websocket_stat_active,
-            frame_counter_in.frames, frame_counter_in.total_payload_size,
-            frame_counter_in.total_size, frame_counter_out.frames,
-            frame_counter_out.total_payload_size, frame_counter_out.total_size);
+            frames_in.frames, frames_in.total_payload_size,
+            frames_in.total_size, frames_out.frames,
+            frames_out.total_payload_size, frames_out.total_size);
 
     b->pos = msg; /* first position in memory of the data */
     b->last =
@@ -210,20 +220,20 @@ my_send(ngx_connection_t *c, u_char *buf, size_t size)
     ngx_http_websocket_stat_ctx *ctx;
     ssize_t sz = size;
     u_char *buffer = buf;
-    ngx_frame_counter_t *frame_counter = &frame_counter_out;
+    ngx_http_websocket_stat_statistic_t *frame_counter = &frames_out;
     frame_counter->total_size += sz;
     ngx_http_request_t *r = c->data;
 
     ctx = ngx_http_get_module_ctx(r, ngx_http_websocket_stat_module);
     template_ctx_s template_ctx;
-    template_ctx.counter = frame_counter;
     template_ctx.from_client = 0;
     template_ctx.ws_ctx = ctx;
     while (sz > 0) {
-        if (frame_counter_process_message(&buffer, &sz, frame_counter)) {
+        if (frame_counter_process_message(&buffer, &sz,
+                                          &(ctx->frame_counter))) {
             frame_counter->frames++;
             frame_counter->total_payload_size +=
-                frame_counter->current_payload_size;
+                ctx->frame_counter.current_payload_size;
             char *log_line = apply_template(log_template, r, &template_ctx);
             websocket_log(log_line);
             free(log_line);
@@ -241,19 +251,18 @@ my_recv(ngx_connection_t *c, u_char *buf, size_t size)
 
     ngx_http_websocket_stat_ctx *ctx;
     ssize_t sz = n;
-    ngx_frame_counter_t *frame_counter = &frame_counter_in;
+    ngx_http_websocket_stat_statistic_t *frame_counter = &frames_in;
     ngx_http_request_t *r = c->data;
     ctx = ngx_http_get_module_ctx(r, ngx_http_websocket_stat_module);
     frame_counter->total_size += n;
     template_ctx_s template_ctx;
-    template_ctx.counter = frame_counter;
     template_ctx.from_client = 1;
     template_ctx.ws_ctx = ctx;
     while (sz > 0) {
-        if (frame_counter_process_message(&buf, &sz, frame_counter)) {
+        if (frame_counter_process_message(&buf, &sz, &ctx->frame_counter)) {
             frame_counter->frames++;
             frame_counter->total_payload_size +=
-                frame_counter->current_payload_size;
+                ctx->frame_counter.current_payload_size;
             if (ws_log) {
                 char *log_line = apply_template(log_template, r, &template_ctx);
                 websocket_log(log_line);
@@ -274,7 +283,6 @@ ngx_http_websocket_stat_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
     ngx_http_websocket_stat_ctx *ctx;
     ctx = ngx_http_get_module_ctx(r, ngx_http_websocket_stat_module);
     template_ctx_s template_ctx;
-    template_ctx.counter = NULL;
     template_ctx.ws_ctx = ctx;
 
     if (r->upstream->upgrade) {
@@ -317,7 +325,7 @@ const char *
 ws_packet_type(ngx_http_request_t *r, void *data)
 {
     template_ctx_s *ctx = data;
-    ngx_frame_counter_t *frame_cntr = ctx->counter;
+    ngx_frame_counter_t *frame_cntr = &(ctx->ws_ctx->frame_counter);
     if (!ctx || !frame_cntr)
         return UNKNOWN_VAR;
     sprintf(buff, "%d", frame_cntr->current_frame_type);
@@ -328,7 +336,7 @@ const char *
 ws_packet_size(ngx_http_request_t *r, void *data)
 {
     template_ctx_s *ctx = data;
-    ngx_frame_counter_t *frame_cntr = ctx->counter;
+    ngx_frame_counter_t *frame_cntr = &ctx->ws_ctx->frame_counter;
     if (!ctx || !frame_cntr)
         return UNKNOWN_VAR;
     sprintf(buff, "%lu", frame_cntr->current_payload_size);

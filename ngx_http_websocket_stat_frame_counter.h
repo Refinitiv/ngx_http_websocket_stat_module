@@ -15,10 +15,7 @@ typedef enum { CONTINUATION, TEXT, BINARY, CLOSE = 8, PING, PONG } frame_type;
 
 // Structure representing frame statistic and parsing stage
 typedef struct {
-    // statistic fields
-    ngx_int_t frames;
     ngx_int_t total_payload_size;
-    ngx_int_t total_size;
 
     // private fields representing current parcing stage
     ngx_int_t bytes_consumed;

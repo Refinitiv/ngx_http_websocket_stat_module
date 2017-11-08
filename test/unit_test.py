@@ -37,7 +37,6 @@ class TestWebStat(unittest.TestCase):
         self.assertEqual(logged_payload, reported_payload)
         self.assertEqual(connections, 0)
     
-    @unittest.skip("")
     def testSimple(self):
         self_run_cmd = local["python3"]['test/ws_test.py'] \
                        [
@@ -52,7 +51,6 @@ class TestWebStat(unittest.TestCase):
                        ]
         self.regularCheck(*[int(x) for x in self_run_cmd().split()])
 
-    @unittest.skip("")
     def test500Cons(self):
         self_run_cmd = local["python3"]['test/ws_test.py'] \
                        [
@@ -67,7 +65,6 @@ class TestWebStat(unittest.TestCase):
                        ]
         self.regularCheck(*[int(x) for x in self_run_cmd().split()])
 
-    @unittest.skip("")
     def testLongRun500Cons(self):
         self_run_cmd = local["python3"]['test/ws_test.py'] \
                        [
@@ -82,7 +79,6 @@ class TestWebStat(unittest.TestCase):
                        ]
         self.regularCheck(*[int(x) for x in self_run_cmd().split()])
 
-    @unittest.skip("")
     def testLargePackets(self):
         self_run_cmd = local["python3"]['test/ws_test.py'] \
                        [
@@ -91,7 +87,7 @@ class TestWebStat(unittest.TestCase):
                        "--fps", 3,
                        "--seconds", 30,
                        "--connections", 5,
-                       "--packet", 3000,
+                       "--packet", 5000,
                        "--instances", 100,
                        "--robot_friendly"
                        ]
@@ -113,15 +109,21 @@ class TestWebStat(unittest.TestCase):
                        "--robot_friendly",
                        "--keepNginx"
                        ]
+        print("First run")
         self_run_cmd()
         self.assertEqual(pid, getNginxPID())
-        memAfter = getTotalMem(pid)
+        mem1stRun = getTotalMem(pid)
+        print("Second run")
         self_run_cmd()
         self.assertEqual(pid, getNginxPID())
         mem2ndRun = getTotalMem(pid)
-        print("Mem before: {}, Mem after: {}, mem2ndrun: {}".format(memBefore, memAfter, mem2ndRun))
-        self.assertTrue(memAfter - memBefore <= 24)
-        self.assertEqual(memAfter, mem2ndRun)
+        print("Third run")
+        self_run_cmd()
+        self.assertEqual(pid, getNginxPID())
+        mem3rdRun = getTotalMem(pid)
+        self.assertTrue(mem1stRun - memBefore <= 24)
+        self.assertEqual(mem1stRun, mem2ndRun)
+        self.assertEqual(mem2ndRun, mem3rdRun)
 
 if __name__ == "__main__":
     f = local["python3"]["test/test_server.py"] & BG
