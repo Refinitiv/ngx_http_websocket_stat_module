@@ -1,4 +1,4 @@
-!/usr/bin/python3
+#!/usr/bin/python3
 import unittest
 from plumbum import local, cli, BG
 from plumbum.commands.processes import ProcessExecutionError
