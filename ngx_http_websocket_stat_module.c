@@ -5,9 +5,12 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 
+#define UID_LENGTH 32
+
 typedef struct {
     time_t ws_conn_start_time;
     ngx_frame_counter_t frame_counter;
+    ngx_str_t connection_id;
 
 } ngx_http_websocket_stat_ctx;
 
@@ -42,6 +45,7 @@ static ngx_int_t ngx_http_websocket_stat_init(ngx_conf_t *cf);
 static void *ngx_http_websocket_stat_create_loc_conf(ngx_conf_t *cf);
 static char *ngx_http_websocket_stat_merge_loc_conf(ngx_conf_t *cf,
                                                     void *parent, void *child);
+const char *get_core_var(ngx_http_request_t *r, const char *variable);
 
 static ngx_atomic_t ngx_websocket_stat_active;
 
@@ -303,6 +307,11 @@ ngx_http_websocket_stat_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
     if (r->upstream->upgrade) {
         if (r->upstream->peer.connection) {
             // connection opened
+            const char *request_id_str = get_core_var(r, "request_id");
+            ctx->connection_id.data = ngx_pcalloc(r->pool, UID_LENGTH + 1);
+            ctx->connection_id.len = UID_LENGTH;
+            memcpy(ctx->connection_id.data, request_id_str, UID_LENGTH + 1);
+
             if (ws_log) {
                 char *log_line =
                     apply_template(log_open_template, r, &template_ctx);
@@ -412,6 +421,15 @@ remote_ip(ngx_http_request_t *r, void *data)
     return buff;
 }
 
+const char *
+request_id(ngx_http_request_t *r, void *data)
+{
+    template_ctx_s *ctx = data;
+    if (!ctx || !ctx->ws_ctx)
+        return UNKNOWN_VAR;
+    return (const char *)ctx->ws_ctx->connection_id.data;
+}
+
 #define GEN_CORE_GET_FUNC(fname, var)                                          \
     const char *fname(ngx_http_request_t *r, void *data)                       \
     {                                                                          \
@@ -419,7 +437,6 @@ remote_ip(ngx_http_request_t *r, void *data)
     }
 
 GEN_CORE_GET_FUNC(request, "request")
-GEN_CORE_GET_FUNC(request_id, "request_id")
 GEN_CORE_GET_FUNC(uri, "uri")
 GEN_CORE_GET_FUNC(remote_user, "remote_user")
 GEN_CORE_GET_FUNC(remote_addr, "remote_addr")
@@ -436,7 +453,7 @@ const template_variable variables[] = {
      local_time},
     {VAR_NAME("$request"), 60, request},
     {VAR_NAME("$uri"), 60, uri},
-    {VAR_NAME("$request_id"), 60, request_id},
+    {VAR_NAME("$request_id"), UID_LENGTH, request_id},
     {VAR_NAME("$remote_user"), 60, remote_user},
     {VAR_NAME("$remote_addr"), 60, remote_addr},
     {VAR_NAME("$remote_port"), 60, remote_port},
