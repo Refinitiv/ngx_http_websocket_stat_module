@@ -307,6 +307,10 @@ ngx_http_websocket_stat_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
     if (r->upstream->upgrade) {
         if (r->upstream->peer.connection) {
             // connection opened
+            ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_websocket_stat_ctx));
+            if (ctx == NULL) {
+                return NGX_HTTP_INTERNAL_SERVER_ERROR;
+            }
             const char *request_id_str = get_core_var(r, "request_id");
             ctx->connection_id.data = ngx_pcalloc(r->pool, UID_LENGTH + 1);
             ctx->connection_id.len = UID_LENGTH;
@@ -317,10 +321,6 @@ ngx_http_websocket_stat_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
                     apply_template(log_open_template, r, &template_ctx);
                 websocket_log(log_line);
                 free(log_line);
-            }
-            ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_websocket_stat_ctx));
-            if (ctx == NULL) {
-                return NGX_HTTP_INTERNAL_SERVER_ERROR;
             }
             ngx_http_set_ctx(r, ctx, ngx_http_websocket_stat_module);
             orig_recv = r->connection->recv;
@@ -430,6 +430,19 @@ request_id(ngx_http_request_t *r, void *data)
     return (const char *)ctx->ws_ctx->connection_id.data;
 }
 
+const char *
+upstream_addr(ngx_http_request_t *r, void *data)
+{
+    template_ctx_s *ctx = data;
+    if (!ctx || !ctx->ws_ctx)
+        return UNKNOWN_VAR;
+    if (r->upstream_states == NULL || r->upstream_states->nelts == 0)
+        return UNKNOWN_VAR;
+    ngx_http_upstream_state_t *state;
+    state = r->upstream_states->elts;
+    return (const char *)state->peer->data;
+}
+
 #define GEN_CORE_GET_FUNC(fname, var)                                          \
     const char *fname(ngx_http_request_t *r, void *data)                       \
     {                                                                          \
@@ -451,6 +464,7 @@ const template_variable variables[] = {
     {VAR_NAME("$ws_conn_age"), NGX_SIZE_T_LEN, ws_connection_age},
     {VAR_NAME("$time_local"), sizeof("Mon, 23 Oct 2017 11:27:42 GMT") - 1,
      local_time},
+    {VAR_NAME("$upstream_addr"), 60, upstream_addr},
     {VAR_NAME("$request"), 60, request},
     {VAR_NAME("$uri"), 60, uri},
     {VAR_NAME("$request_id"), UID_LENGTH, request_id},

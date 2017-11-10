@@ -38,6 +38,7 @@ Here is a list of variables you can use in log format string:
  * $remote_port - Client's remote port
  * $server_addr - Server's remote ip address
  * $server_port - Server's port
+ * $upstream_addr - websocket backend address
 
 To read websocket statistic there is GET request should be set up at "location" location of nginx config file with ws_stat command in it. Look into example section for details.
 

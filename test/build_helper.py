@@ -115,6 +115,7 @@ def clearLog():
     rm_cmd(os.path.join(ngx_dir, ws_log_file))
     
 class ThisApp(cli.Application):
+    skip_lib_build = cli.Flag(['--skip-lib-build'])
     def main(self, action):
         if action == "clean":
             clean(links)
@@ -123,8 +124,9 @@ class ThisApp(cli.Application):
             download(links)
             print("Exctracting...")
             untar(links) 
-            print("Building libraries...")
-            make(links)
+            if not self.skip_lib_build:
+                print("Building libraries...")
+                make(links)
             print("Building nginx...")
             make_nginx(links)
         elif action == "conf":
