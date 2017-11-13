@@ -1,3 +1,6 @@
+[![Travis Build Status](https://travis-ci.org/thomsonreuters/ngx_http_websocket_stat_module.svg?branch=master)](https://travis-ci.org/thomsonreuters/ngx_http_websocket_stat_module.svg?branch=master)
+
+
 # NGINX module websocket connection and traffic statistics
 
 Nginx module developed for logging and displaying statistic of websocket proxy connections traffic. 
