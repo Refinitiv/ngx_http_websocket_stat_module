@@ -105,8 +105,9 @@ frame_counter_process_message(u_char **buffer, ssize_t *size,
             if (*size >= (u_int)(frame_counter->current_payload_size -
                                  frame_counter->bytes_consumed)) {
 
-                move_buffer(buffer, size, frame_counter->current_payload_size -
-                                              frame_counter->bytes_consumed);
+                move_buffer(buffer, size,
+                            frame_counter->current_payload_size -
+                                frame_counter->bytes_consumed);
                 frame_counter->stage = HEADER;
                 return 1;
             } else {

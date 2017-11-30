@@ -15,9 +15,9 @@ typedef struct {
 } ngx_http_websocket_stat_ctx;
 
 typedef struct {
-    ngx_int_t frames;
-    ngx_int_t total_payload_size;
-    ngx_int_t total_size;
+    ngx_atomic_t *frames;
+    ngx_atomic_t *total_payload_size;
+    ngx_atomic_t *total_size;
 } ngx_http_websocket_stat_statistic_t;
 
 ngx_http_websocket_stat_statistic_t frames_in;
@@ -47,7 +47,7 @@ static char *ngx_http_websocket_stat_merge_loc_conf(ngx_conf_t *cf,
                                                     void *parent, void *child);
 const char *get_core_var(ngx_http_request_t *r, const char *variable);
 
-static ngx_atomic_t ngx_websocket_stat_active;
+static ngx_atomic_t *ngx_websocket_stat_active;
 
 char CARET_RETURN = '\n';
 ngx_log_t *ws_log = NULL;
@@ -150,10 +150,10 @@ ngx_http_websocket_stat_handler(ngx_http_request_t *r)
     /* Insertion in the buffer chain. */
     out.buf = b;
     out.next = NULL;
-    sprintf((char *)msg, (char *)responce_template, ngx_websocket_stat_active,
-            frames_in.frames, frames_in.total_payload_size,
-            frames_in.total_size, frames_out.frames,
-            frames_out.total_payload_size, frames_out.total_size);
+    sprintf((char *)msg, (char *)responce_template, *ngx_websocket_stat_active,
+            *frames_in.frames, *frames_in.total_payload_size,
+            *frames_in.total_size, *frames_out.frames,
+            *frames_out.total_payload_size, *frames_out.total_size);
 
     b->pos = msg; /* first position in memory of the data */
     b->last =
@@ -225,7 +225,7 @@ my_send(ngx_connection_t *c, u_char *buf, size_t size)
     ssize_t sz = size;
     u_char *buffer = buf;
     ngx_http_websocket_stat_statistic_t *frame_counter = &frames_out;
-    frame_counter->total_size += sz;
+    ngx_atomic_fetch_add(frame_counter->total_size, sz);
     ngx_http_request_t *r = c->data;
 
     ctx = ngx_http_get_module_ctx(r, ngx_http_websocket_stat_module);
@@ -235,9 +235,9 @@ my_send(ngx_connection_t *c, u_char *buf, size_t size)
     while (sz > 0) {
         if (frame_counter_process_message(&buffer, &sz,
                                           &(ctx->frame_counter))) {
-            frame_counter->frames++;
-            frame_counter->total_payload_size +=
-                ctx->frame_counter.current_payload_size;
+            ngx_atomic_fetch_add(frame_counter->frames, 1);
+            ngx_atomic_fetch_add(frame_counter->total_payload_size,
+                                 ctx->frame_counter.current_payload_size);
             char *log_line = apply_template(log_template, r, &template_ctx);
             websocket_log(log_line);
             free(log_line);
@@ -247,7 +247,7 @@ my_send(ngx_connection_t *c, u_char *buf, size_t size)
     if (n < 0) {
 
         ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "WTF send");
-        ngx_atomic_fetch_add(&ngx_websocket_stat_active, -1);
+        ngx_atomic_fetch_add(ngx_websocket_stat_active, -1);
         if (ws_log) {
             char *log_line =
                 apply_template(log_close_template, r, &template_ctx);
@@ -272,16 +272,17 @@ my_recv(ngx_connection_t *c, u_char *buf, size_t size)
     ngx_http_websocket_stat_statistic_t *frame_counter = &frames_in;
     ngx_http_request_t *r = c->data;
     ctx = ngx_http_get_module_ctx(r, ngx_http_websocket_stat_module);
-    frame_counter->total_size += n;
+    ngx_atomic_fetch_add(frame_counter->total_size, n);
     template_ctx_s template_ctx;
     template_ctx.from_client = 1;
     template_ctx.ws_ctx = ctx;
     ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "size: %d", sz);
     while (sz > 0) {
         if (frame_counter_process_message(&buf, &sz, &ctx->frame_counter)) {
-            frame_counter->frames++;
-            frame_counter->total_payload_size +=
-                ctx->frame_counter.current_payload_size;
+
+            ngx_atomic_fetch_add(frame_counter->frames, 1);
+            ngx_atomic_fetch_add(frame_counter->total_payload_size,
+                                 ctx->frame_counter.current_payload_size);
             if (ws_log) {
                 char *log_line = apply_template(log_template, r, &template_ctx);
                 websocket_log(log_line);
@@ -327,10 +328,10 @@ ngx_http_websocket_stat_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
             r->connection->recv = my_recv;
             orig_send = r->connection->send;
             r->connection->send = my_send;
-            ngx_atomic_fetch_add(&ngx_websocket_stat_active, 1);
+            ngx_atomic_fetch_add(ngx_websocket_stat_active, 1);
             ctx->ws_conn_start_time = ngx_time();
         } else {
-            ngx_atomic_fetch_add(&ngx_websocket_stat_active, -1);
+            ngx_atomic_fetch_add(ngx_websocket_stat_active, -1);
             if (ws_log) {
                 char *log_line =
                     apply_template(log_close_template, r, &template_ctx);
@@ -526,10 +527,38 @@ ngx_http_websocket_stat_merge_loc_conf(ngx_conf_t *cf, void *parent,
     return NGX_CONF_OK;
 }
 
+static void
+allocate_counters()
+{
+    const int cl = 128; // cache line size
+    const int variables = 7;
+    ngx_shm_t shm;
+    shm.size = cl * variables; //
+    shm.log = ngx_cycle->log;
+    ngx_str_set(&shm.name, "websocket_stat_shared_zone");
+    if (ngx_shm_alloc(&shm) != NGX_OK) {
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                      "Failed to allocate shared memory");
+        return;
+    }
+    int var_counter = 0;
+    frames_in.frames = (ngx_atomic_t *)(shm.addr + (var_counter++) * cl);
+    frames_in.total_payload_size =
+        (ngx_atomic_t *)(shm.addr + (var_counter++) * cl);
+    frames_in.total_size = (ngx_atomic_t *)(shm.addr + (var_counter++) * cl);
+    frames_out.frames = (ngx_atomic_t *)(shm.addr + (var_counter++) * cl);
+    frames_out.total_payload_size =
+        (ngx_atomic_t *)(shm.addr + (var_counter++) * cl);
+    frames_out.total_size = (ngx_atomic_t *)(shm.addr + (var_counter++) * cl);
+    ngx_websocket_stat_active =
+        (ngx_atomic_t *)(shm.addr + (var_counter++) * cl);
+    assert(var_counter <= variables);
+}
+
 static ngx_int_t
 ngx_http_websocket_stat_init(ngx_conf_t *cf)
 {
-
+    allocate_counters();
     ngx_http_next_body_filter = ngx_http_top_body_filter;
     ngx_http_top_body_filter = ngx_http_websocket_stat_body_filter;
 
