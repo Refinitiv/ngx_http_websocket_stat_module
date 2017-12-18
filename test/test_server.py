@@ -10,8 +10,7 @@ async def hello(websocket, path):
 		try:
 			name = await websocket.recv()
 
-			greeting = "Hello {}!".format(name)
-			await websocket.send(greeting)
+			await websocket.send("{} bytes received".format(len(name)))
 		except ConnectionClosed:
 			pass
 

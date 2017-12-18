@@ -84,11 +84,11 @@ class TestWebStat(unittest.TestCase):
                        [
                        "-h", "127.0.0.1:8080",
                        "-w",
-                       "--fps", 1,
-                       "--seconds", 10,
-                       "--connections", 1,
+                       "--fps", 10,
+                       "--seconds", 0,
+                       "--connections", 5,
                        "--packet", 1000000,
-                       "--instances", 1,
+                       "--instances", 2,
                        "--robot_friendly"
                        ]
         self.regularCheck(*[int(x) for x in self_run_cmd().split()])

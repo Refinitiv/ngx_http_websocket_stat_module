@@ -30,7 +30,9 @@ http
    server
    {{
       ws_log {log};
-      ws_log_format "$time_local: $request_id packet from $ws_packet_source payload: $ws_payload_size";
+      ws_log_format "$time_local: packet from $ws_packet_source, type: $ws_opcode, payload: $ws_payload_size";
+      ws_log_format open "$time_local: Connection opened";
+      ws_log_format close "$time_local: Connection closed";
       listen {port};
       location /stat {{
          ws_stat;
