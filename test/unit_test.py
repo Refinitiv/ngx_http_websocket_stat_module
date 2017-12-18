@@ -86,9 +86,9 @@ class TestWebStat(unittest.TestCase):
                        "-w",
                        "--fps", 1,
                        "--seconds", 10,
-                       "--connections", 5,
-                       "--packet", 10000,
-                       "--instances", 100,
+                       "--connections", 1,
+                       "--packet", 1000000,
+                       "--instances", 1,
                        "--robot_friendly"
                        ]
         self.regularCheck(*[int(x) for x in self_run_cmd().split()])
@@ -109,21 +109,14 @@ class TestWebStat(unittest.TestCase):
                        "--robot_friendly",
                        "--keepNginx"
                        ]
-        print("First run")
-        self_run_cmd()
-        self.assertEqual(pid, getNginxPID())
-        mem1stRun = getTotalMem(pid)
-        print("Second run")
-        self_run_cmd()
-        self.assertEqual(pid, getNginxPID())
-        mem2ndRun = getTotalMem(pid)
-        print("Third run")
-        self_run_cmd()
-        self.assertEqual(pid, getNginxPID())
-        mem3rdRun = getTotalMem(pid)
-        self.assertTrue(mem1stRun - memBefore <= 24)
-        self.assertEqual(mem1stRun, mem2ndRun)
-        self.assertEqual(mem2ndRun, mem3rdRun)
+        Runs = 5
+        memRuns = set()
+        for i in range(0, Runs):
+            print("{} run".format(i+1))
+            self_run_cmd()
+            self.assertEqual(pid, getNginxPID())
+            memRuns.add(getTotalMem(pid))
+        self.assertEqual(len(memRuns), 1)
 
 if __name__ == "__main__":
     f = local["python3"]["test/test_server.py"] & BG
