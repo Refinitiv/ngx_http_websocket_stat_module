@@ -3,14 +3,12 @@ dist: trusty
 
 python:
  - "3.5"
-env:
- - TOXENV=py35
 
 install:
  - pip3 install plumbum
  - pip3 install websocket-client
- - pip3 install websockets
  - pip3 install asyncio
+ - pip install tornado
 
 before_script:
  - python3 test/build_helper.py build

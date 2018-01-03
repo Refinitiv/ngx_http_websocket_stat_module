@@ -119,7 +119,7 @@ class TestWebStat(unittest.TestCase):
         self.assertEqual(len(memRuns), 1)
 
 if __name__ == "__main__":
-    f = local["python3"]["test/test_server.py"] & BG
+    f = local["python2"]["test/test_server.py"] & BG
     try:
         unittest.main()
     finally:

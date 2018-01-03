@@ -1,26 +1,31 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 
-from plumbum import cli
-import asyncio
-import websockets
-from websockets.exceptions import ConnectionClosed
+import tornado.ioloop
+import tornado.web
+import tornado.websocket
+import tornado.template
 
-async def hello(websocket, path):
-	while(True):
-		try:
-			name = await websocket.recv()
+class WSHandler(tornado.websocket.WebSocketHandler):
+  def check_origin(self, origin):
+    return True
+  def open(self):
+    print 'connection opened...'
+    self.write_message("The server says: 'Hello'. Connection was accepted.")
 
-			await websocket.send("{} bytes received".format(len(name)))
-		except ConnectionClosed:
-			pass
+  def on_message(self, message):
+    print (len(message))
+    self.write_message("Received {0} bytes".format(len(message)))
+    print ('received: {0}'.format(len(message)))
 
-class App(cli.Application):
-    port = cli.SwitchAttr(['-p'], int , default = 5000)
-    def main(self):
-        print("Listening at {}".format(self.port))
-        start_server = websockets.serve(hello, '0.0.0.0', self.port)
-        asyncio.get_event_loop().run_until_complete(start_server)
-        asyncio.get_event_loop().run_forever()
+  def on_close(self):
+    print 'connection closed...'
 
-App.run()
-        
+application = tornado.web.Application([
+  (r'/streaming', WSHandler),
+])
+
+if __name__ == "__main__":
+  port = 5000
+  print("listening on port {0}".format(port))
+  application.listen(port)
+  tornado.ioloop.IOLoop.instance().start()

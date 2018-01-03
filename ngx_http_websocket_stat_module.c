@@ -238,9 +238,11 @@ my_send(ngx_connection_t *c, u_char *buf, size_t size)
             ngx_atomic_fetch_add(frame_counter->frames, 1);
             ngx_atomic_fetch_add(frame_counter->total_payload_size,
                                  ctx->frame_counter.current_payload_size);
-            char *log_line = apply_template(log_template, r, &template_ctx);
-            websocket_log(log_line);
-            free(log_line);
+            if (ws_log) {
+              char *log_line = apply_template(log_template, r, &template_ctx);
+              websocket_log(log_line);
+              free(log_line);
+            }
         }
     }
     int n = orig_send(c, buf, size);
