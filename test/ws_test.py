@@ -1,7 +1,5 @@
 #!/usr/bin/python3
-from plumbum import cli
-from plumbum import local 
-from plumbum import BG
+from plumbum import cli, local, BG
 from plumbum.commands.processes import ProcessExecutionError
 import threading
 import http.client
@@ -15,6 +13,7 @@ from test_config import ws_log_file, conf_file, ngx_dir
 import logging
 import os
 import sys
+from test_utils import ws_stat, parseLogs
 
 logger = logging.getLogger('ws_test')
 
@@ -70,29 +69,6 @@ class RequestThread(threading.Thread):
             self.startWebSocketConnection()
         else:
             self.startHTTPConnection()
-
-def parseLogs(logfile):
-    try:
-        chain = local["cat"][logfile] | local["grep"] ["packet from client"] | local["wc"]["-l"]
-        frames = int(chain())
-        chain = local["cat"][logfile] | local["grep"] ["packet from client"] | \
-                local["sed"]["-n", 's/.*payload: \\(.*\\)/\\1/p'] | local["paste"]["-sd+"] | local["bc"]
-        payload = int(chain())
-        return frames, payload
-    except ProcessExecutionError as e:
-        logger.error("Error parsing log files:\n{}".format(e))
-        return 0,0
-
-
-def ws_stat(host):
-    try:
-        conn = http.client.HTTPConnection(host)
-        conn.request("GET", "/stat")
-        resp = conn.getresponse()
-        data = resp.read()
-        return data.decode('ascii')
-    except http.client.RemoteDisconnected:
-        return None
 
 def parseStat(host):
     try:

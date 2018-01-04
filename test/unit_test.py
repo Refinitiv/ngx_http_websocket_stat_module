@@ -4,6 +4,21 @@ from plumbum import local, cli, BG
 from plumbum.commands.processes import ProcessExecutionError
 
 build_hlpr_cmd = local["python3"]["test/build_helper.py"]
+f = None
+
+def startWebsocketSrv():
+    global f
+    f = local["python2"]["test/test_server.py"] & BG
+
+def killWebsocketSrv():
+    global f
+    if not f is None:
+        f.proc.kill()
+        f.proc.stdout.close()
+        f.proc.stdin.close()
+        f.proc.stderr.close()
+        f = None
+
 
 def getNginxPID():
     chain = local["pgrep"]["nginx"] | local["tail"]["-n1"]
@@ -38,6 +53,7 @@ class TestWebStat(unittest.TestCase):
         self.assertEqual(connections, 0)
     
     def testSimple(self):
+        startWebsocketSrv()
         self_run_cmd = local["python3"]['test/ws_test.py'] \
                        [
                        "-h", "127.0.0.1:8080",
@@ -50,8 +66,10 @@ class TestWebStat(unittest.TestCase):
                        "--robot_friendly"
                        ]
         self.regularCheck(*[int(x) for x in self_run_cmd().split()])
+        killWebsocketSrv()
 
     def test500Cons(self):
+        startWebsocketSrv()
         self_run_cmd = local["python3"]['test/ws_test.py'] \
                        [
                        "-h", "127.0.0.1:8080",
@@ -64,8 +82,10 @@ class TestWebStat(unittest.TestCase):
                        "--robot_friendly"
                        ]
         self.regularCheck(*[int(x) for x in self_run_cmd().split()])
+        killWebsocketSrv()
 
     def testLongRun500Cons(self):
+        startWebsocketSrv()
         self_run_cmd = local["python3"]['test/ws_test.py'] \
                        [
                        "-h", "127.0.0.1:8080",
@@ -78,8 +98,10 @@ class TestWebStat(unittest.TestCase):
                        "--robot_friendly"
                        ]
         self.regularCheck(*[int(x) for x in self_run_cmd().split()])
+        killWebsocketSrv()
 
     def testLargePackets(self):
+        startWebsocketSrv()
         self_run_cmd = local["python3"]['test/ws_test.py'] \
                        [
                        "-h", "127.0.0.1:8080",
@@ -92,8 +114,10 @@ class TestWebStat(unittest.TestCase):
                        "--robot_friendly"
                        ]
         self.regularCheck(*[int(x) for x in self_run_cmd().split()])
+        killWebsocketSrv()
 
     def testMemoryLeak(self):
+        startWebsocketSrv()
         pid = startNginx()
         memory = local["pmap"]
         memBefore = getTotalMem(pid)
@@ -117,11 +141,12 @@ class TestWebStat(unittest.TestCase):
             self.assertEqual(pid, getNginxPID())
             memRuns.add(getTotalMem(pid))
         self.assertEqual(len(memRuns), 1)
+        killWebsocketSrv()
 
 if __name__ == "__main__":
-    f = local["python2"]["test/test_server.py"] & BG
     try:
         unittest.main()
     finally:
-        f.proc.kill()
+        killWebsocketSrv()
+        pass
 
