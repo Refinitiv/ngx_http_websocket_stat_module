@@ -1,6 +1,5 @@
 #!/usr/bin/python3
 from plumbum import cli, local, BG
-from plumbum.commands.processes import ProcessExecutionError
 import threading
 import http.client
 import time

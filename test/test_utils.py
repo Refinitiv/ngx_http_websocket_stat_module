@@ -1,5 +1,6 @@
 import http.client
 from plumbum import local 
+from plumbum.commands.processes import ProcessExecutionError
 
 def ws_stat(host):
     try:
