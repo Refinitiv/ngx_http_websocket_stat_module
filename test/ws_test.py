@@ -11,7 +11,7 @@ import sys
 from test_config import ws_log_file, conf_file, ngx_dir
 import threading
 import time
-from test_utils import ws_stat, parseLogs
+from test_utils import ws_stat, parseLogs, parseStat
 from websocket import create_connection
 
 logger = logging.getLogger('ws_test')
@@ -68,19 +68,6 @@ class RequestThread(threading.Thread):
             self.startWebSocketConnection()
         else:
             self.startHTTPConnection()
-
-def parseStat(host):
-    try:
-        data = ws_stat(host)
-        data = data.split('\n')
-        cons = data[0].split()[2]
-        instat_line = data[2].split()
-        frames = instat_line[0]
-        payload = instat_line[1]
-        return  cons, frames, payload
-    except IndexError: 
-        logger.info("Wrong data: {}".format(data))
-        return 0,0,0
 
 result_exp = re.compile("Total frames: (\d+), total bytes: (\d+)")
 class TestApp(cli.Application):

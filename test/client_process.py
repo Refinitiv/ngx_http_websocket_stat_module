@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 import plumbum
 import Pyro4
 import sys
@@ -6,7 +6,7 @@ import os
 import time
 from threading import Thread, Event
 from functools import reduce
-from websocket import create_connection
+from websocket import create_connection, WebSocketException
 from test_utils import ws_stat, parseLogs
 
 import logging
@@ -28,6 +28,9 @@ class ConnectionThread(Thread):
             self.ws = create_connection(url)
         except ConnectionRefusedError:
             logger.warn("Cannot connect to {}".format(url))
+        except WebSocketException as e:
+            logger.warn("Websocket connection error: {}".format(e))
+            self.ws = None
         self.packet_size = packet_size
         self.send_delay = float(send_delay)
         self.frames_sent = 0
@@ -37,15 +40,18 @@ class ConnectionThread(Thread):
         while not self.stopped:
             data = self.packet_size * 'a'
             try:
-                self.ws.send(data)
-                self.frames_sent += 1
-                self.bytes_sent += len(data)
+                if self.ws:
+                    self.ws.send(data)
+                    self.frames_sent += 1
+                    self.bytes_sent += len(data)
                 if self.send_delay:
                     time.sleep(self.send_delay)
             except BrokenPipeError:
                 logger.warn("connection closed")
+                self.ws = None
             except ConnectionRefusedError:
                 logger.warn("Cannot connect to server")
+                self.ws = None
             if self.paused:
                 self.paused_ev.set()
                 self.unpaused_ev.clear()

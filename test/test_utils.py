@@ -27,3 +27,31 @@ def parseLogs(logfile):
         logger.error("Error parsing log files:\n{}".format(e))
         return 0,0
 
+def parseStat(host):
+    try:
+        data = ws_stat(host)
+        data = data.split('\n')
+        cons = data[0].split()[2]
+        instat_line = data[2].split()
+        frames = instat_line[0]
+        payload = instat_line[1]
+        return  cons, frames, payload
+    except IndexError: 
+        logger.info("Wrong data: {}".format(data))
+        return 0,0,0
+
+def getNginxPids():
+    chain = local["pgrep"]["nginx"] | local["tail"]["-n+2"]
+    return chain().split()
+
+def getMemUsage(pids):
+    result = []
+    for pid in pids:
+        chain = local["sudo"]["pmap"][pid] | local["tail"]["-n1"]
+        result.append(chain().split()[1])
+    return result
+
+def getVarnishPids():
+    return local["pgrep"]["varnishd"]().split()
+
+
