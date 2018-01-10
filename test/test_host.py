@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 import Pyro4
 import time
 import logging

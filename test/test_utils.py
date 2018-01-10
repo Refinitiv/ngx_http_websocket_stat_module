@@ -1,6 +1,9 @@
 import http.client
+import logging
 from plumbum import local 
 from plumbum.commands.processes import ProcessExecutionError
+
+logger = logging.getLogger('ws_test')
 
 def ws_stat(host):
     try:

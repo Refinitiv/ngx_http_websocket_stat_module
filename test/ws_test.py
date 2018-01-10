@@ -1,18 +1,18 @@
 #!/usr/bin/python3
-from plumbum import cli, local, BG
-import threading
-import http.client
-import time
-import re
-from websocket import create_connection
-from functools import reduce
-import operator
 from build_helper import nginxCtl, clearLog, make_nginx_conf
-from test_config import ws_log_file, conf_file, ngx_dir
+from functools import reduce
+import http.client
 import logging
+import operator
 import os
+from plumbum import cli, local, BG
+import re
 import sys
+from test_config import ws_log_file, conf_file, ngx_dir
+import threading
+import time
 from test_utils import ws_stat, parseLogs
+from websocket import create_connection
 
 logger = logging.getLogger('ws_test')
 
