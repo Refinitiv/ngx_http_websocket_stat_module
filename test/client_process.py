@@ -85,10 +85,14 @@ class ConnectionThread(Thread):
 thrs = []
 @Pyro4.expose
 class RemoteCommander(object):
-    def start(self, connections, url, packet_size, send_delay):
-        logger.info("Starting {} connections".format(connections))
+
+    def init(self, connections, url, packet_size, send_delay):
+        logger.info("Initializing {} connections".format(connections))
         for i in range(0, connections):
             thrs.append(ConnectionThread(url, packet_size, send_delay))
+
+    def start(self):
+        logger.info("sTarting {} threads".format(len(thrs)))
         for t in thrs:
             t.start()
 

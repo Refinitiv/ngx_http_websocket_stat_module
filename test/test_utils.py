@@ -1,5 +1,6 @@
 import http.client
 import logging
+import math
 from plumbum import local 
 from plumbum.commands.processes import ProcessExecutionError
 
@@ -8,7 +9,7 @@ logger = logging.getLogger('ws_test')
 def ws_stat(host):
     try:
         conn = http.client.HTTPConnection(host)
-        conn.request("GET", "/stat")
+        conn.request("GET", "/ws_stat")
         resp = conn.getresponse()
         data = resp.read()
         return data.decode('ascii')
@@ -53,5 +54,18 @@ def getMemUsage(pids):
 
 def getVarnishPids():
     return local["pgrep"]["varnishd"]().split()
+
+def humanReadableSize(size):
+    size = int(size)
+    modifiers = ['B', 'KB', 'MB', 'GB', 'TB']
+    if size <= 0:
+        return str(size)
+    dim = math.floor(math.log(size, 1024))
+    if dim > len(modifiers) - 1:
+        dim = len(modifiers) - 1
+    num = size / (1024 ** dim)
+    return "{:0.1f}{}".format(num, modifiers[dim])
+
+
 
 
