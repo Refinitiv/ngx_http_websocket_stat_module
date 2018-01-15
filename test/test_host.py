@@ -3,7 +3,8 @@ import Pyro4
 import time
 import logging
 from functools import reduce
-from plumbum import local, BG, cli
+from plumbum import local, BG, cli, SshMachine
+from plumbum.machines.session import SSHCommsError
 from test_utils import parseStat, getVarnishPids, getNginxPids, getMemUsage, humanReadableSize
 
 logger = logging.getLogger("test-host")
@@ -20,12 +21,14 @@ h  = logging.FileHandler("test_report.txt")
 h.setFormatter(fmt)
 report_logger.addHandler(h)
 
+python_cmd = "python3"
+client_script_path = "test/client_process.py"
 
 class ClientProcess(object):
 
-    host_cmd = local["python3"]["test/client_process.py"]
-    def __init__(self):
-        self._host = ClientProcess.host_cmd & BG
+    def __init__(self, machine):
+        self.cmd = machine[python_cmd][client_script_path]
+        self._host = self.cmd & BG
         uri = self._host.proc.stdout.readline().decode('ascii').strip()
         logger.debug ("Process spawned, Pyro4 uri: {}".format(uri))
         self._cmd = Pyro4.Proxy(uri)
@@ -46,8 +49,11 @@ class TestApplication(cli.Application):
     packet_size = cli.SwitchAttr(['-s'], int, default = 10 ** 3, help = "Size of websocket frame")
     ws_server = cli.SwitchAttr(['-w'], str, default = "127.0.0.1:8080", help = "Websocket server host[:port]")
     iteration = cli.SwitchAttr(['--iterations'], int,  default = 10, help = "Number of test results probing iterations")
+    remotes = cli.SwitchAttr(['--remote'], str, list = True, default = [],
+                             help = "remote user@address of the remote machine to run client process on")
 
     def main(self):
+        print (self.remotes)
         def calcTotalMem(mems):
             return "{}K".format(reduce(lambda x, y: x + int(y.replace('K','')), mems, 0))
 
@@ -62,8 +68,24 @@ class TestApplication(cli.Application):
                             calcTotalMem(nginx_init_mem), calcTotalMem(varnish_init_mem)))
         report_logger.info("Per process: Nginx: {}, Varnish: {}".format(nginx_init_mem, varnish_init_mem))
         logger.info("Spawning workers")
+        remote_index = 0
         for i in range(0, self.instances):
-            self.procs.append(ClientProcess())
+            machine = local
+            if len(self.remotes) != 0:
+                remote_addr = self.remotes[ remote_index ]
+                try:
+                    user, host = remote_addr.split('@')
+                    machine = SshMachine(host, user = user)
+                except ValueError:
+                    logger.error("{}: Wrong remote address format".format(remote_addr))
+                    exit(1)
+                except SSHCommsError:
+                    logger.error("Error sshing to {}".format(remote_addr))
+                    exit(1)
+                remote_index += 1
+                if remote_index == len(self.remotes):
+                    remote_index = 0
+            self.procs.append(ClientProcess(machine))
         logger.info("Opening connections")
         for proc in self.procs:
             proc.cmd().init(self.connections, "ws://{}/streaming".format(self.ws_server), self.packet_size, 0.3)
