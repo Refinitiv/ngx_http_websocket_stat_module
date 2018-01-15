@@ -1,5 +1,5 @@
 #!/usr/bin/python
-import plumbum
+from plumbum import cli
 import Pyro4
 import sys
 import os
@@ -14,6 +14,33 @@ import logging
 logging.basicConfig(filename='client.log'.format(os.getpid()), level=logging.INFO)
 logger  = logging.getLogger('client.{}'.format(os.getpid()))
 
+watchdogTimeout = 5 * 60
+
+"""
+Watchdog class that to kill this process if there where
+no commands from the client for some period of time.
+"""
+class WatchDog(Thread):
+    def __init__(self, timeout):
+        Thread.__init__(self)
+        self.timeout = timeout
+        self.lastSeen = time.time()
+
+    def run(self):
+        while True:
+            time.sleep(3)
+            if time.time() - self.lastSeen > self.timeout:
+                logger.info("Client exited on timeout")
+                os._exit(0)
+
+    def update(self):
+        self.lastSeen = time.time()
+
+"""
+This thread does all the work. It sends single websocket packet of siz
+<packet_size> on ws server specifid in <url> every <send_delay>
+seconds (could be fractional e.g. 0.3 for 300 milliseconds).
+"""
 class ConnectionThread(Thread):
     def __init__(self, url, packet_size, send_delay):
         Thread.__init__(self)
@@ -83,22 +110,43 @@ class ConnectionThread(Thread):
         self.stopped_ev.wait()
 
 thrs = []
+watchdog = WatchDog(watchdogTimeout)
+watchdog.start()
+
+"""
+Wrapper for rpc function to update watchdog when some command from the
+test_host arrives.
+"""
+def watchdogUpdate(func):
+    def f_wrapper(*args, **kwargs):
+        watchdog.update()
+        return func(*args, **kwargs)
+    return f_wrapper
+
+"""
+Class to receive command from the teest_host.
+It is sync call i.e. server wait until command would return a result.
+"""
 @Pyro4.expose
 class RemoteCommander(object):
 
+    @watchdogUpdate
     def init(self, connections, url, packet_size, send_delay):
         logger.info("Initializing {} connections".format(connections))
         for i in range(0, connections):
             thrs.append(ConnectionThread(url, packet_size, send_delay))
 
+    @watchdogUpdate
     def start(self):
-        logger.info("sTarting {} threads".format(len(thrs)))
+        logger.info("Starting {} threads".format(len(thrs)))
         for t in thrs:
             t.start()
 
+    @watchdogUpdate
     def stat(self):
         return reduce(lambda x, y: (x[0] + y.frames_sent, x[1] + y.bytes_sent) ,thrs, (0, 0))
 
+    @watchdogUpdate
     def pause(self):
         for t in thrs:
             t.pause()
@@ -106,11 +154,18 @@ class RemoteCommander(object):
             t.pause_wait()
         return "paused"
 
+    @watchdogUpdate
     def unpause(self):
         for t in thrs:
             t.unpause()
         return "unpaused"
 
+    @watchdogUpdate
+    def exit(self):
+        logger.info("Client exited on request")
+        os._exit(0)
+
+    @watchdogUpdate
     def stop_proc(self):
         try:
             logger.debug("stopping")
@@ -125,11 +180,16 @@ class RemoteCommander(object):
             logger.info("exception")
             logger.info(e)
 
+class App(cli.Application):
+    host = cli.SwitchAttr(['-h'], str, default = "localhost")
+    def main(self):
+        daemon = Pyro4.Daemon(host = self.host)
+        uri = daemon.register(RemoteCommander)
+        logger.info("URI is {}".format(uri))
+        sys.stdout.write("{}\n".format(uri))
+        sys.stdout.flush()
+        daemon.requestLoop()
+        logger.debug('bb')
+
 if __name__ == "__main__":
-    daemon = Pyro4.Daemon()
-    uri = daemon.register(RemoteCommander)
-    logger.info("URI is {}".format(uri))
-    sys.stdout.write("{}\n".format(uri))
-    sys.stdout.flush()
-    daemon.requestLoop()
-    logger.debug('bb')
+    App.run()

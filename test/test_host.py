@@ -24,17 +24,26 @@ report_logger.addHandler(h)
 python_cmd = "python3"
 client_script_path = "test/client_process.py"
 
+"""
+This class help to spawn test process and to controll it execution over the rpc
+calls.
+"""
 class ClientProcess(object):
 
-    def __init__(self, machine):
+    def __init__(self, machine, host = None):
         cmd = machine[python_cmd][client_script_path]
+        if host:
+            cmd = cmd['-h'][host]
         self._host = cmd & BG
         uri = self._host.proc.stdout.readline().decode('ascii').strip()
         logger.debug ("Process spawned, Pyro4 uri: {}".format(uri))
         self._cmd = Pyro4.Proxy(uri)
 
-    def kill(self):
-        self._host.proc.kill()
+    def exit(self):
+        try:
+            self.cmd().exit()
+        except Pyro4.errors.ConnectionClosedError:
+            pass
 
     def cmd(self):
         return self._cmd
@@ -48,6 +57,16 @@ class TestApplication(cli.Application):
     iteration = cli.SwitchAttr(['--iterations'], int,  default = 10, help = "Number of test results probing iterations")
     remotes = cli.SwitchAttr(['--remote'], str, list = True, default = [],
                              help = "remote user@address of the remote machine to run client process on")
+
+    @cli.switch('--python-path', str, help = "Alternative python interpitor path.")
+    def python_path(self, new_path):
+        global python_cmd
+        python_cmd = new_path
+
+    @cli.switch('--script-path', str, help = "Alternative worker script path")
+    def script_path(self, new_path):
+        global client_script_path
+        client_script_path = new_path
 
     def main(self):
         def calcTotalMem(mems):
@@ -66,12 +85,12 @@ class TestApplication(cli.Application):
         logger.info("Spawning workers")
         remote_index = 0
         for i in range(0, self.instances):
-            machine = local
             if len(self.remotes) != 0:
                 remote_addr = self.remotes[ remote_index ]
                 try:
                     user, host = remote_addr.split('@')
                     machine = SshMachine(host, user = user)
+                    self.procs.append(ClientProcess(machine, host = host))
                 except ValueError:
                     logger.error("{}: Wrong remote address format".format(remote_addr))
                     exit(1)
@@ -81,11 +100,19 @@ class TestApplication(cli.Application):
                 remote_index += 1
                 if remote_index == len(self.remotes):
                     remote_index = 0
-            self.procs.append(ClientProcess(machine))
+            else:
+                self.procs.append(ClientProcess(local))
+
         logger.info("Opening connections")
         for proc in self.procs:
+            #proc.cmd().start()
             proc.cmd().init(self.connections, "ws://{}/streaming".format(self.ws_server), self.packet_size, 0.3)
+            pass
+        #time.sleep(1000000)
+        #exit(0)
         logger.info("Starting workers")
+
+
         for proc in self.procs:
             proc.cmd().start()
         report_logger.info("Monitoring stats")
@@ -158,6 +185,6 @@ class TestApplication(cli.Application):
         finally:
             logger.info("Terminating worker process")
             for proc in self.procs:
-                proc.kill()
+                proc.exit()
             logger.info("Done")
 TestApplication.run()
