@@ -17,7 +17,7 @@ logger.addHandler(h)
 report_logger = logging.getLogger("test-report")
 report_logger.setLevel(logging.INFO)
 report_logger.addHandler(h)
-h  = logging.FileHandler("test_report.txt")
+h  = logging.FileHandler("test_report.txt", mode = "w")
 h.setFormatter(fmt)
 report_logger.addHandler(h)
 
