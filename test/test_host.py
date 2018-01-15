@@ -27,14 +27,11 @@ client_script_path = "test/client_process.py"
 class ClientProcess(object):
 
     def __init__(self, machine):
-        self.cmd = machine[python_cmd][client_script_path]
-        self._host = self.cmd & BG
+        cmd = machine[python_cmd][client_script_path]
+        self._host = cmd & BG
         uri = self._host.proc.stdout.readline().decode('ascii').strip()
         logger.debug ("Process spawned, Pyro4 uri: {}".format(uri))
         self._cmd = Pyro4.Proxy(uri)
-
-    def uri(self):
-        return self._uri
 
     def kill(self):
         self._host.proc.kill()
@@ -53,7 +50,6 @@ class TestApplication(cli.Application):
                              help = "remote user@address of the remote machine to run client process on")
 
     def main(self):
-        print (self.remotes)
         def calcTotalMem(mems):
             return "{}K".format(reduce(lambda x, y: x + int(y.replace('K','')), mems, 0))
 
