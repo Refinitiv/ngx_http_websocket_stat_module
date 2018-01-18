@@ -247,8 +247,6 @@ my_send(ngx_connection_t *c, u_char *buf, size_t size)
     }
     int n = orig_send(c, buf, size);
     if (n < 0) {
-
-        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "WTF send");
         ngx_atomic_fetch_add(ngx_websocket_stat_active, -1);
         if (ws_log) {
             char *log_line =
@@ -266,8 +264,9 @@ my_recv(ngx_connection_t *c, u_char *buf, size_t size)
 {
 
     int n = orig_recv(c, buf, size);
-    if (n < 0)
-        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "WTF");
+    if (n <= 0) {
+        return;
+    }
 
     ngx_http_websocket_stat_ctx *ctx;
     ssize_t sz = n;
@@ -278,7 +277,6 @@ my_recv(ngx_connection_t *c, u_char *buf, size_t size)
     template_ctx_s template_ctx;
     template_ctx.from_client = 1;
     template_ctx.ws_ctx = ctx;
-    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "size: %d", sz);
     while (sz > 0) {
         if (frame_counter_process_message(&buf, &sz, &ctx->frame_counter)) {
 

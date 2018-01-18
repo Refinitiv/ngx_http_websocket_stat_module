@@ -18,7 +18,7 @@ watchdogTimeout = 5 * 60
 
 """
 Watchdog class that to kill this process if there where
-no commands from the client for some period of time.
+no commands from the test host for some period of time.
 """
 class WatchDog(Thread):
     def __init__(self, timeout):

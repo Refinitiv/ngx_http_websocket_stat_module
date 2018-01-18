@@ -104,7 +104,6 @@ frame_counter_process_message(u_char **buffer, ssize_t *size,
         case PAYLOAD:
             if (*size >= (u_int)(frame_counter->current_payload_size -
                                  frame_counter->bytes_consumed)) {
-
                 move_buffer(buffer, size,
                             frame_counter->current_payload_size -
                                 frame_counter->bytes_consumed);
@@ -114,16 +113,14 @@ frame_counter_process_message(u_char **buffer, ssize_t *size,
                 frame_counter->bytes_consumed += *size;
                 if (frame_counter->bytes_consumed >
                     frame_counter->current_payload_size) {
-                    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "WTF?");
+                    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "Unknown error");
                     frame_counter->stage = HEADER;
                 }
                 *buffer += *size;
                 *size = 0;
             }
             break;
-
         default:
-
             ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "Unknown stage");
             move_buffer(buffer, size, 1);
         }

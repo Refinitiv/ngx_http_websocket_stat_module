@@ -105,13 +105,11 @@ class TestApplication(cli.Application):
 
         logger.info("Opening connections")
         for proc in self.procs:
-            #proc.cmd().start()
             proc.cmd().init(self.connections, "ws://{}/streaming".format(self.ws_server), self.packet_size, 0.3)
             pass
-        #time.sleep(1000000)
-        #exit(0)
+        stat = parseStat(self.ws_server)
+        report_logger.info("{} connections opened".format(stat[0]))
         logger.info("Starting workers")
-
 
         for proc in self.procs:
             proc.cmd().start()
@@ -144,6 +142,7 @@ class TestApplication(cli.Application):
                 report_logger.info("Reported:")
                 report_logger.info("Frames: {}, Bytes: {}({}), Webscoket connections: {}".format(
                                     stat[1], humanReadableSize(stat[2]), stat[2], stat[0]))
+                report_logger.info("Franes delta: {}".format(int(stat[1]) - int(frames)))
 
                 if(nginx_pids != getNginxPids()):
                         report_logger.warn("one or more of the nginx process has been restarted")
