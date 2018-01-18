@@ -265,7 +265,7 @@ my_recv(ngx_connection_t *c, u_char *buf, size_t size)
 
     int n = orig_recv(c, buf, size);
     if (n <= 0) {
-        return;
+        return n;
     }
 
     ngx_http_websocket_stat_ctx *ctx;
