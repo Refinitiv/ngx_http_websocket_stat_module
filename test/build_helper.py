@@ -18,6 +18,7 @@ def getLinkFilename(link):
 def getLinkDir(link):
     return os.path.join(ngx_dir, getLinkFilename(link).replace(".tar.gz", ""))
 
+print(local.cwd.split("/")[-1])
 if local.cwd.split("/")[-1]!= "ngx_http_websocket_stat_module":
     print("this script is supposed to be run from repo root dir")
     exit(1)
@@ -72,6 +73,7 @@ def make_nginx(links):
                     "--with-zlib=" + os.path.join(this_dir, getLinkDir(links["zlib"])),
                     "--with-http_stub_status_module",
                     "--with-openssl=" + os.path.join(this_dir, getLinkDir(links["openssl"])),
+                    "--with-http_ssl_module",
                     "--add-module="+this_dir
                     ]
     print("Configuring {}".format(conf_cmd))

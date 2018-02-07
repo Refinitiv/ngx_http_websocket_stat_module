@@ -5,7 +5,17 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 
+#include <openssl/bio.h>
+#include <openssl/evp.h>
+#include <openssl/sha.h>
+
 #define UID_LENGTH 32
+#define KEY_SIZE 24
+#define ACCEPT_SIZE 28
+#define GUID_SIZE 36
+// It contains 36 characters.
+char const *const kWsGUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+char const *const kWsKey = "Sec-WebSocket-Key";
 
 typedef struct {
     time_t ws_conn_start_time;
@@ -35,6 +45,10 @@ typedef struct {
 
 static char *ngx_http_websocket_stat(ngx_conf_t *cf, ngx_command_t *cmd,
                                      void *conf);
+static char *ngx_http_websocket_max_conn_setup(ngx_conf_t *cf,
+                                               ngx_command_t *cmd, void *conf);
+static char *ngx_http_websocket_max_conn_age(ngx_conf_t *cf, ngx_command_t *cmd,
+                                             void *conf);
 static char *ngx_http_ws_logfile(ngx_conf_t *cf, ngx_command_t *cmd,
                                  void *conf);
 static char *ngx_http_ws_log_format(ngx_conf_t *cf, ngx_command_t *cmd,
@@ -42,16 +56,36 @@ static char *ngx_http_ws_log_format(ngx_conf_t *cf, ngx_command_t *cmd,
 static ngx_int_t ngx_http_websocket_stat_handler(ngx_http_request_t *r);
 static ngx_int_t ngx_http_websocket_stat_init(ngx_conf_t *cf);
 
-static void *ngx_http_websocket_stat_create_loc_conf(ngx_conf_t *cf);
-static char *ngx_http_websocket_stat_merge_loc_conf(ngx_conf_t *cf,
-                                                    void *parent, void *child);
+static void *ngx_http_websocket_stat_create_main_conf(ngx_conf_t *cf);
 const char *get_core_var(ngx_http_request_t *r, const char *variable);
+
+static void send_close_packet(ngx_connection_t *connection, int status,
+                              const char *reason);
 
 static ngx_atomic_t *ngx_websocket_stat_active;
 
 char CARET_RETURN = '\n';
 ngx_log_t *ws_log = NULL;
 const char *UNKNOWN_VAR = "???";
+
+static void
+Base64Encode(unsigned char *hash, int hash_len, char *buffer, int len)
+{
+    BIO *b64, *mem;
+    b64 = BIO_new(BIO_f_base64());
+    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+    mem = BIO_new(BIO_s_mem());
+    BIO_push(b64, mem);
+    BIO_set_flags(b64, BIO_FLAGS_BASE64_NO_NL);
+    BIO_write(b64, hash, hash_len);
+    if (BIO_flush(b64) != 1) {
+        printf("Error performing base64 encoding");
+    }
+    char *data;
+    BIO_get_mem_data(mem, &data);
+    memcpy(buffer, data, len);
+    BIO_free_all(b64);
+}
 
 void
 websocket_log(char *str)
@@ -62,8 +96,20 @@ websocket_log(char *str)
     ngx_write_fd(ws_log->file->fd, &CARET_RETURN, sizeof(char));
 }
 
-typedef struct ngx_http_websocket_local_conf_s {
-} ngx_http_websocket_local_conf_t;
+void
+ws_do_log(compiled_template *template, ngx_http_request_t *r, void *ctx)
+{
+    if (ws_log) {
+        char *log_line = apply_template(template, r, ctx);
+        websocket_log(log_line);
+        free(log_line);
+    }
+}
+
+typedef struct ngx_http_websocket_main_conf_s {
+    int max_ws_connections;
+    int max_ws_age;
+} ngx_http_websocket_main_conf_t;
 
 compiled_template *log_template;
 compiled_template *log_close_template;
@@ -85,6 +131,10 @@ static ngx_command_t ngx_http_websocket_stat_commands[] = {
      0, /* No offset. Only one context is supported. */
      0, /* No offset when storing the module configuration on struct. */
      NULL},
+    {ngx_string("ws_max_connections"), NGX_HTTP_SRV_CONF | NGX_CONF_TAKE1,
+     ngx_http_websocket_max_conn_setup, 0, 0, NULL},
+    {ngx_string("ws_conn_age"), NGX_HTTP_SRV_CONF | NGX_CONF_TAKE1,
+     ngx_http_websocket_max_conn_age, 0, 0, NULL},
     {ngx_string("ws_log"), NGX_HTTP_SRV_CONF | NGX_CONF_TAKE1,
      ngx_http_ws_logfile, 0, 0, NULL},
     {ngx_string("ws_log_format"), NGX_HTTP_SRV_CONF | NGX_CONF_1MORE,
@@ -97,14 +147,14 @@ static ngx_http_module_t ngx_http_websocket_stat_module_ctx = {
     NULL,                         /* preconfiguration */
     ngx_http_websocket_stat_init, /* postconfiguration */
 
-    NULL, /* create main configuration */
-    NULL, /* init main configuration */
+    ngx_http_websocket_stat_create_main_conf, /* create main configuration */
+    NULL,                                     /* init main configuration */
 
     NULL, /* create server configuration */
     NULL, /* merge server configuration */
 
-    ngx_http_websocket_stat_create_loc_conf, /* create location configuration */
-    ngx_http_websocket_stat_merge_loc_conf   /* merge location configuration */
+    NULL, /* create location configuration */
+    NULL  /* merge location configuration */
 };
 
 /* Module definition. */
@@ -123,6 +173,7 @@ ngx_module_t ngx_http_websocket_stat_module = {
     NGX_MODULE_V1_PADDING};
 
 static ngx_http_output_body_filter_pt ngx_http_next_body_filter;
+static ngx_http_output_header_filter_pt ngx_http_next_header_filter;
 
 static u_char responce_template[] =
     "WebSocket connections: %lu\n"
@@ -196,6 +247,32 @@ ngx_http_websocket_stat(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 } /* ngx_http_hello_world */
 
 static char *
+ngx_http_websocket_max_conn_setup(ngx_conf_t *cf, ngx_command_t *cmd,
+                                  void *conf)
+{
+    ngx_str_t *value;
+    value = cf->args->elts;
+    ngx_http_websocket_main_conf_t *main_conf = conf;
+    main_conf->max_ws_connections = atoi((char *)value[1].data);
+    return NGX_CONF_OK;
+}
+static char *
+ngx_http_websocket_max_conn_age(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
+{
+    ngx_str_t *value;
+    value = cf->args->elts;
+    ngx_int_t timeout;
+    timeout = ngx_parse_time(&value[1], 1);
+    if (timeout == NGX_ERROR) {
+        return NGX_CONF_ERROR;
+    }
+    ngx_http_websocket_main_conf_t *main_conf = conf;
+    main_conf->max_ws_age = timeout;
+
+    return NGX_CONF_OK;
+}
+
+static char *
 ngx_http_ws_logfile(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 {
 
@@ -212,10 +289,21 @@ ngx_http_ws_logfile(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
 
     return NGX_CONF_OK;
 }
+typedef ssize_t (*send_func)(ngx_connection_t *c, u_char *buf, size_t size);
+send_func orig_recv, orig_send;
 
-ssize_t (*orig_recv)(ngx_connection_t *c, u_char *buf, size_t size);
-ssize_t (*orig_send)(ngx_connection_t *c, u_char *buf, size_t size);
-
+static int
+check_ws_age(time_t conn_start_time, ngx_http_request_t *r)
+{
+    ngx_http_websocket_main_conf_t *conf;
+    conf = ngx_http_get_module_main_conf(r, ngx_http_websocket_stat_module);
+    if (conf->max_ws_age > 0 &&
+        ngx_time() - conn_start_time >= conf->max_ws_age) {
+        send_close_packet(r->connection, 4001, "Connection is Aged");
+        return NGX_ERROR;
+    }
+    return NGX_OK;
+}
 // Packets that being send to a client
 ssize_t
 my_send(ngx_connection_t *c, u_char *buf, size_t size)
@@ -229,6 +317,9 @@ my_send(ngx_connection_t *c, u_char *buf, size_t size)
     ngx_http_request_t *r = c->data;
 
     ctx = ngx_http_get_module_ctx(r, ngx_http_websocket_stat_module);
+    if (check_ws_age(ctx->ws_conn_start_time, r) != NGX_OK) {
+        return NGX_ERROR;
+    }
     template_ctx_s template_ctx;
     template_ctx.from_client = 0;
     template_ctx.ws_ctx = ctx;
@@ -238,22 +329,13 @@ my_send(ngx_connection_t *c, u_char *buf, size_t size)
             ngx_atomic_fetch_add(frame_counter->frames, 1);
             ngx_atomic_fetch_add(frame_counter->total_payload_size,
                                  ctx->frame_counter.current_payload_size);
-            if (ws_log) {
-              char *log_line = apply_template(log_template, r, &template_ctx);
-              websocket_log(log_line);
-              free(log_line);
-            }
+            ws_do_log(log_template, r, &template_ctx);
         }
     }
     int n = orig_send(c, buf, size);
     if (n < 0) {
         ngx_atomic_fetch_add(ngx_websocket_stat_active, -1);
-        if (ws_log) {
-            char *log_line =
-                apply_template(log_close_template, r, &template_ctx);
-            websocket_log(log_line);
-            free(log_line);
-        }
+        ws_do_log(log_close_template, r, &template_ctx);
     }
     return n;
 }
@@ -273,6 +355,9 @@ my_recv(ngx_connection_t *c, u_char *buf, size_t size)
     ngx_http_websocket_stat_statistic_t *frame_counter = &frames_in;
     ngx_http_request_t *r = c->data;
     ctx = ngx_http_get_module_ctx(r, ngx_http_websocket_stat_module);
+    if (check_ws_age(ctx->ws_conn_start_time, r) != NGX_OK) {
+        return NGX_ERROR;
+    }
     ngx_atomic_fetch_add(frame_counter->total_size, n);
     template_ctx_s template_ctx;
     template_ctx.from_client = 1;
@@ -283,15 +368,17 @@ my_recv(ngx_connection_t *c, u_char *buf, size_t size)
             ngx_atomic_fetch_add(frame_counter->frames, 1);
             ngx_atomic_fetch_add(frame_counter->total_payload_size,
                                  ctx->frame_counter.current_payload_size);
-            if (ws_log) {
-                char *log_line = apply_template(log_template, r, &template_ctx);
-                websocket_log(log_line);
-                free(log_line);
-            }
+            ws_do_log(log_template, r, &template_ctx);
         }
     }
 
     return n;
+}
+
+static ngx_int_t
+ngx_http_websocket_stat_header_filter(ngx_http_request_t *r)
+{
+    return ngx_http_next_header_filter(r);
 }
 
 static ngx_int_t
@@ -317,12 +404,7 @@ ngx_http_websocket_stat_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
             ctx->connection_id.len = UID_LENGTH;
             memcpy(ctx->connection_id.data, request_id_str, UID_LENGTH + 1);
 
-            if (ws_log) {
-                char *log_line =
-                    apply_template(log_open_template, r, &template_ctx);
-                websocket_log(log_line);
-                free(log_line);
-            }
+            ws_do_log(log_open_template, r, &template_ctx);
             ngx_http_set_ctx(r, ctx, ngx_http_websocket_stat_module);
             orig_recv = r->connection->recv;
             r->connection->recv = my_recv;
@@ -332,12 +414,7 @@ ngx_http_websocket_stat_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
             ctx->ws_conn_start_time = ngx_time();
         } else {
             ngx_atomic_fetch_add(ngx_websocket_stat_active, -1);
-            if (ws_log) {
-                char *log_line =
-                    apply_template(log_close_template, r, &template_ctx);
-                websocket_log(log_line);
-                free(log_line);
-            }
+            ws_do_log(log_close_template, r, &template_ctx);
         }
     }
 
@@ -479,14 +556,16 @@ const template_variable variables[] = {
     {NULL, 0, 0, NULL}};
 
 static void *
-ngx_http_websocket_stat_create_loc_conf(ngx_conf_t *cf)
+ngx_http_websocket_stat_create_main_conf(ngx_conf_t *cf)
 {
-    ngx_http_websocket_local_conf_t *conf;
+    ngx_http_websocket_main_conf_t *conf;
 
-    conf = ngx_pcalloc(cf->pool, sizeof(ngx_http_websocket_local_conf_t));
+    conf = ngx_pcalloc(cf->pool, sizeof(ngx_http_websocket_main_conf_t));
     if (conf == NULL) {
         return NULL;
     }
+    conf->max_ws_connections = -1;
+    conf->max_ws_age = -1;
 
     return conf;
 }
@@ -520,13 +599,6 @@ ngx_http_ws_log_format(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
     }
 }
 
-static char *
-ngx_http_websocket_stat_merge_loc_conf(ngx_conf_t *cf, void *parent,
-                                       void *child)
-{
-    return NGX_CONF_OK;
-}
-
 static void
 allocate_counters()
 {
@@ -555,10 +627,115 @@ allocate_counters()
     assert(var_counter <= variables);
 }
 
+static ngx_table_elt_t *
+find_header_in(ngx_http_request_t *r, const char *header_name)
+{
+    if (!r) {
+        return NULL;
+    }
+    ngx_list_part_t *part;
+    ngx_table_elt_t *header;
+    part = &r->headers_in.headers.part;
+    header = part->elts;
+    int i = part->nelts - 1;
+    while (1) {
+        if (strcasecmp((char *)header[i].key.data, header_name) == 0) {
+            return &header[i];
+        }
+        if (--i < 0) {
+            if (!part->next)
+                break;
+            part = part->next;
+            header = part->elts;
+            i = part->nelts - 1;
+        }
+    }
+    return NULL;
+}
+
+static void
+send_close_packet(ngx_connection_t *connection, int status, const char *reason)
+{
+    // send close packet
+    char cbuf[256];
+    memset(cbuf, 0, sizeof(cbuf));
+    cbuf[0] = 0x88; // Fin, Close : 1000 1000
+    int rlen = strlen(reason);
+    rlen += 2;                       // add 2b status
+    const int max_payload_len = 125; // wo extended len
+    rlen = (rlen > max_payload_len) ? max_payload_len : rlen;
+    cbuf[1] = rlen;                 // Payload Len: 0... ....
+    cbuf[2] = 0xFF & (status >> 8); // Status MSB : .... .... (Big Endian)
+    cbuf[3] = 0xFF & status;        // Status LSB : .... ....
+    memcpy(&cbuf[4], reason, rlen);
+    int cbuflen = rlen + 2;
+    orig_send(connection, (unsigned char *)cbuf, cbuflen);
+}
+
+char salt[GUID_SIZE + KEY_SIZE + 1];
+char access_key[ACCEPT_SIZE + 1];
+unsigned char hash[SHA_DIGEST_LENGTH];
+
+static const char *const resp_template = "HTTP/1.1 101 Switching Protocols\n"
+                                         "Upgrade: WebSocket\n"
+                                         "Connection: Upgrade\n"
+                                         "Sec-WebSocket-Accept: %s\n\n";
+
+static void
+complete_ws_handshake(ngx_connection_t *connection, const char *ws_key)
+{
+    unsigned char hash[SHA_DIGEST_LENGTH];
+    memcpy(salt, ws_key, KEY_SIZE);
+    memcpy(salt + KEY_SIZE, kWsGUID, GUID_SIZE);
+
+    SHA1((unsigned char *)salt, sizeof(salt) - 1, hash);
+
+    Base64Encode(hash, SHA_DIGEST_LENGTH, access_key, ACCEPT_SIZE);
+    access_key[ACCEPT_SIZE] = '\0';
+    char resp[256];
+    sprintf(resp, resp_template, access_key);
+    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0,
+                  "Websocket connection closed");
+    connection->send(connection, (unsigned char *)resp, strlen(resp));
+}
+
+static ngx_int_t
+ngx_http_websocket_request_handler(ngx_http_request_t *r)
+{
+    ngx_http_websocket_main_conf_t *conf;
+    conf = ngx_http_get_module_main_conf(r, ngx_http_websocket_stat_module);
+    if (conf == NULL) {
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    }
+
+    if (conf->max_ws_connections > 0 &&
+        conf->max_ws_connections == (int)*ngx_websocket_stat_active) {
+        ngx_table_elt_t *upgrade_hdr = find_header_in(r, "Upgrade");
+        if (!upgrade_hdr ||
+            strcasecmp((char *)upgrade_hdr->value.data, "websocket") != 0) {
+            // This is not a websocket conenction, allow it.
+            return NGX_OK;
+        }
+        ngx_table_elt_t *hdr = find_header_in(r, kWsKey);
+        if (!hdr || hdr->value.len != KEY_SIZE) {
+            // Request should contain a valid Sec-Webscoket-Key header.
+            return NGX_HTTP_BAD_REQUEST;
+        }
+        complete_ws_handshake(r->connection, (const char *)hdr->value.data);
+        send_close_packet(r->connection, 1013, "Try Again Later");
+        return NGX_ERROR;
+    }
+    return NGX_OK;
+}
+
 static ngx_int_t
 ngx_http_websocket_stat_init(ngx_conf_t *cf)
 {
     allocate_counters();
+
+    ngx_http_next_header_filter = ngx_http_top_header_filter;
+    ngx_http_top_header_filter = ngx_http_websocket_stat_header_filter;
+
     ngx_http_next_body_filter = ngx_http_top_body_filter;
     ngx_http_top_body_filter = ngx_http_websocket_stat_body_filter;
 
@@ -574,6 +751,17 @@ ngx_http_websocket_stat_init(ngx_conf_t *cf)
         log_close_template = compile_template(default_close_log_template_str,
                                               variables, cf->pool);
     }
+
+    ngx_http_handler_pt *h;
+    ngx_http_core_main_conf_t *cmcf;
+    cmcf = ngx_http_conf_get_module_main_conf(cf, ngx_http_core_module);
+
+    h = ngx_array_push(&cmcf->phases[NGX_HTTP_ACCESS_PHASE].handlers);
+    if (h == NULL) {
+        return NGX_ERROR;
+    }
+
+    *h = ngx_http_websocket_request_handler;
 
     return NGX_OK;
 }
