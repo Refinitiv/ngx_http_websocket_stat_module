@@ -33,6 +33,8 @@ http
       ws_log_format "$time_local: packet from $ws_packet_source, type: $ws_opcode, payload: $ws_payload_size";
       ws_log_format open "$time_local: Connection opened";
       ws_log_format close "$time_local: Connection closed";
+#      ws_max_connections 1;
+#      ws_conn_age 12h;
       listen {port};
       location /stat {{
          ws_stat;
@@ -45,6 +47,8 @@ http
          proxy_set_header Upgrade $http_upgrade;
          proxy_set_header Connection "keep-alive, Upgrade";
          proxy_http_version 1.1;                           
+         proxy_read_timeout 40s;
+         proxy_send_timeout 12h;
       }}
    }}
 
