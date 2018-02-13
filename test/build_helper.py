@@ -18,7 +18,6 @@ def getLinkFilename(link):
 def getLinkDir(link):
     return os.path.join(ngx_dir, getLinkFilename(link).replace(".tar.gz", ""))
 
-print(local.cwd.split("/")[-1])
 if local.cwd.split("/")[-1]!= "ngx_http_websocket_stat_module":
     print("this script is supposed to be run from repo root dir")
     exit(1)

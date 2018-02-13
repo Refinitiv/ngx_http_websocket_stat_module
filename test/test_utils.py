@@ -9,7 +9,7 @@ logger = logging.getLogger('ws_test')
 def ws_stat(host):
     try:
         conn = http.client.HTTPConnection(host)
-        conn.request("GET", "/ws_stat")
+        conn.request("GET", "/stat")
         resp = conn.getresponse()
         data = resp.read()
         return data.decode('ascii')
