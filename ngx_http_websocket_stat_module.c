@@ -334,8 +334,10 @@ my_send(ngx_connection_t *c, u_char *buf, size_t size)
     }
     int n = orig_send(c, buf, size);
     if (n < 0) {
-        ngx_atomic_fetch_add(ngx_websocket_stat_active, -1);
-        ws_do_log(log_close_template, r, &template_ctx);
+        if(!ngx_atomic_cmp_set(ngx_websocket_stat_active, 0, 0)){
+          ngx_atomic_fetch_add(ngx_websocket_stat_active, -1);
+          ws_do_log(log_close_template, r, &template_ctx);
+        }
     }
     return n;
 }
@@ -413,8 +415,10 @@ ngx_http_websocket_stat_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
             ngx_atomic_fetch_add(ngx_websocket_stat_active, 1);
             ctx->ws_conn_start_time = ngx_time();
         } else {
-            ngx_atomic_fetch_add(ngx_websocket_stat_active, -1);
-            ws_do_log(log_close_template, r, &template_ctx);
+          if(!ngx_atomic_cmp_set(ngx_websocket_stat_active, 0, 0)){
+              ngx_atomic_fetch_add(ngx_websocket_stat_active, -1);
+              ws_do_log(log_close_template, r, &template_ctx);
+            }
         }
     }
 
