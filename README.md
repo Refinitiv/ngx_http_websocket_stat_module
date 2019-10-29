@@ -1,4 +1,4 @@
-[![Travis Build Status](https://travis-ci.org/thomsonreuters/ngx_http_websocket_stat_module.svg?branch=master)](https://travis-ci.org/thomsonreuters/ngx_http_websocket_stat_module.svg?branch=master)
+[![Travis Build Status](https://travis-ci.org/refinitiv/ngx_http_websocket_stat_module.svg?branch=master)](https://travis-ci.org/refinitiv/ngx_http_websocket_stat_module.svg?branch=master)
 
 
 # NGINX module websocket connection and traffic statistics
@@ -71,3 +71,9 @@ server
 
 ```
 
+## Copyright
+
+This document is licensed under BSD-2-Clause license. See LICENSE for details.
+
+The code has been opened by (c) Thomson Reuters.
+It is now maintained by (c) Refinitiv.
