@@ -5,6 +5,7 @@ download_dir = os.path.join(ngx_dir, "download")
 conf_file = "nginx.conf"
 
 links = {
+"nginx_upstream_check_module": "https://codeload.github.com/Refinitiv/nginx_upstream_check_module/tar.gz/master#nginx_upstream_check_module-master",
 "pcre" : "https://ftp.pcre.org/pub/pcre/pcre-8.41.tar.gz",
 "zlib" : "https://zlib.net/zlib-1.2.11.tar.gz",
 "openssl": "https://www.openssl.org/source/openssl-1.0.2k.tar.gz",

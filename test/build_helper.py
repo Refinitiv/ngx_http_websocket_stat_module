@@ -13,9 +13,11 @@ import time
 mkdir_cmd = local["mkdir"]["-p"]
 
 def getLinkFilename(link):
-    return link.split("/")[-1]
+    return link.split("#")[0].split("/")[-1]
 
 def getLinkDir(link):
+    if "#" in link:
+        return os.path.join(ngx_dir, link.split("#")[1])
     return os.path.join(ngx_dir, getLinkFilename(link).replace(".tar.gz", ""))
 
 if local.cwd.split("/")[-1]!= "ngx_http_websocket_stat_module":
@@ -41,7 +43,7 @@ def download(links):
        if os.path.exists(path):
            continue
        print("Downloading {}".format(filename))
-       wget_cmd(link, '--directory-prefix', download_dir)
+       wget_cmd(link.split("#")[0], '--directory-prefix', download_dir)
 
 def untar(links):
     for lib in links:
@@ -51,7 +53,7 @@ def untar(links):
 
 def make(links):
     for lib in links:
-       if lib == "nginx":
+       if lib.startswith("nginx"):
            continue
        filename = getLinkFilename(links[lib])
        directory = getLinkDir(links[lib])
@@ -72,7 +74,7 @@ def make_nginx(links):
                     "--with-zlib=" + os.path.join(this_dir, getLinkDir(links["zlib"])),
                     "--with-http_stub_status_module",
                     "--with-openssl=" + os.path.join(this_dir, getLinkDir(links["openssl"])),
-                    "--add-module=../../../nginx_upstream_check_module",
+                    "--add-module=../nginx_upstream_check_module-master",
                     "--with-http_ssl_module",
                     "--with-file-aio",
                     "--with-http_addition_module",
