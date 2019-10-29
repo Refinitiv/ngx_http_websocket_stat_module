@@ -84,7 +84,6 @@ def make_nginx(links):
                     "--with-http_flv_module",
                     "--with-http_gunzip_module",
                     "--with-http_gzip_static_module",
-                    "--with-http_image_filter_module",
                     "--with-http_random_index_module",
                     "--with-http_realip_module",
                     "--with-http_secure_link_module",
