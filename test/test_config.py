@@ -5,10 +5,10 @@ download_dir = os.path.join(ngx_dir, "download")
 conf_file = "nginx.conf"
 
 links = {
-"pcre" : "ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre/pcre-8.41.tar.gz",
-"zlib" : "http://zlib.net/zlib-1.2.11.tar.gz",
-"openssl": "http://www.openssl.org/source/openssl-1.0.2k.tar.gz",
-"nginx": "http://nginx.org/download/nginx-1.12.0.tar.gz"
+"pcre" : "https://ftp.pcre.org/pub/pcre/pcre-8.41.tar.gz",
+"zlib" : "https://zlib.net/zlib-1.2.11.tar.gz",
+"openssl": "https://www.openssl.org/source/openssl-1.0.2k.tar.gz",
+"nginx": "https://nginx.org/download/nginx-1.12.0.tar.gz"
 }
 
 ws_backend = "http://brokerstats-test.financial.com/streaming"
