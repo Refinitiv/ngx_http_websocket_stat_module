@@ -394,7 +394,7 @@ ngx_http_websocket_stat_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
     template_ctx_s template_ctx;
     template_ctx.ws_ctx = ctx;
 
-    if (r->upstream->upgrade) {
+    if (r->headers_in.upgrade) {
         if (r->upstream->peer.connection) {
             // connection opened
             ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_websocket_stat_ctx));

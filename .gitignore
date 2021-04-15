@@ -1,3 +1,5 @@
 *swp
 *o
 *__pycache__*
+.idea/*
+.vscode/*
