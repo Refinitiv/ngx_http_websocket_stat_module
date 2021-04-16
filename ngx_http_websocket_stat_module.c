@@ -425,14 +425,19 @@ ngx_http_websocket_stat_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
             memcpy(ctx->connection_id.data, request_id_str, UID_LENGTH + 1);
             ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "WS IS OPENED");
             ws_do_log(log_open_template, r, &template_ctx);
+            ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "WS IS OPENED LOGGED");
             ngx_http_set_ctx(r, ctx, ngx_http_websocket_stat_module);
-            ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "PATCHED RECV");
+            ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "CONTEXT IS SET");
             orig_recv = r->connection->recv;
             r->connection->recv = my_recv;
-            ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "PATCHED SEND");
+            ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "PATCHED RECV");
+            
             orig_send = r->connection->send;
             r->connection->send = my_send;
+            ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "PATCHED SEND");
+
             ngx_atomic_fetch_add(ngx_websocket_stat_active, 1);
+            ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "CONN COUNTED");
             ctx->ws_conn_start_time = ngx_time();
         } else {
           if(!ngx_atomic_cmp_set(ngx_websocket_stat_active, 0, 0)){
