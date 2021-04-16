@@ -190,10 +190,14 @@ char *
 apply_template(compiled_template *template_cmpl, ngx_http_request_t *r,
                void *data)
 {
+    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "TEMPLATING 1");
     char *result = malloc(strlen(template_cmpl->compiled_template_str) + 1);
+    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "MEM IS ALLOCATED");
     strcpy(result, template_cmpl->compiled_template_str);
+    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "COPY STR");
     unsigned int i;
     for (i = 0; i < template_cmpl->variable_occurances->nelts; i++) {
+        ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "TEMPLATE VAR REPL");
         variable_occurance *occ =
             ((variable_occurance **)
                  template_cmpl->variable_occurances->elts)[i];
@@ -210,7 +214,9 @@ apply_template(compiled_template *template_cmpl, ngx_http_request_t *r,
                    occ->variable->len < len ? occ->variable->len : len);
         }
     }
+    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "REMOVE PLACEHOLDERS");
     _remove_placeholder_chars(result);
+    ngx_log_error(NGX_LOG_ERR, ngx_cycle->log, 0, "REMOVED PLACEHOLDERS");
     return result;
 }
 
