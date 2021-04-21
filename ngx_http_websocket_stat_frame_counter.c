@@ -37,6 +37,12 @@ frame_counter_process_message(u_char **buffer, ssize_t *size,
         switch (frame_counter->stage) {
         case HEADER:
             frame_counter->current_frame_type = **buffer & 0x0f;
+            frame_counter->fragment_final = **buffer >> 7;
+
+            if (frame_counter->current_frame_type != CONTINUATION) {
+                frame_counter->current_message_size = 0;
+            }
+
             move_buffer(buffer, size, 1);
             frame_counter->stage = PAYLOAD_LEN;
             frame_counter->bytes_consumed =
@@ -102,6 +108,7 @@ frame_counter_process_message(u_char **buffer, ssize_t *size,
             }
             break;
         case PAYLOAD:
+            frame_counter->current_message_size += *size;
             if (*size >= (u_int)(frame_counter->current_payload_size -
                                  frame_counter->bytes_consumed)) {
                 move_buffer(buffer, size,
