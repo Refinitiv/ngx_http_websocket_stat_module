@@ -141,27 +141,31 @@ ssize_t
 my_send(ngx_connection_t *c, u_char *buf, size_t size)
 {
     ngx_http_request_t *r = c->data;
-    ngx_http_websocket_srv_conf_t *srvcf =
-        ngx_http_get_module_srv_conf(r, ngx_http_websocket_stat_module);
-    ngx_http_websocket_stat_ctx *ctx;
-    ssize_t sz = size;
-    u_char *buffer = buf;
+    ngx_http_websocket_srv_conf_t *srvcf = ngx_http_get_module_srv_conf(r, ngx_http_websocket_stat_module);
+    ngx_http_websocket_stat_ctx *ctx = ngx_http_get_module_ctx(r, ngx_http_websocket_stat_module);
 
-    ctx = ngx_http_get_module_ctx(r, ngx_http_websocket_stat_module);
     if (check_ws_age(ctx->ws_conn_start_time, r) != NGX_OK) {
         return NGX_ERROR;
     }
+
     template_ctx_s template_ctx;
     template_ctx.from_client = 0;
     template_ctx.ws_ctx = ctx;
+
+    int n = orig_send(c, buf, size);
+    if (n <= 0) {
+        ws_do_log(srvcf->log_close_template, r, &template_ctx);
+        return n;
+    }
+
+    ssize_t sz = n;
+
     while (sz > 0) {
-        if (frame_counter_process_message(&buffer, &sz,
-                                          &(ctx->frame_counter))) {
+        if (frame_counter_process_message(&buf, &sz, &(ctx->frame_counter))) {
             ws_do_log(get_ws_log_template(ctx, srvcf), r, &template_ctx);
         }
     }
 
-    int n = orig_send(c, buf, size);
     return n;
 }
 
@@ -170,13 +174,8 @@ ssize_t
 my_recv(ngx_connection_t *c, u_char *buf, size_t size)
 {
     ngx_http_request_t *r = c->data;
-    ngx_http_websocket_srv_conf_t *srvcf =
-        ngx_http_get_module_srv_conf(r, ngx_http_websocket_stat_module);
-    ngx_http_websocket_stat_ctx *ctx =
-        ngx_http_get_module_ctx(r, ngx_http_websocket_stat_module);
-    template_ctx_s template_ctx;
-    template_ctx.from_client = 1;
-    template_ctx.ws_ctx = ctx;
+    ngx_http_websocket_srv_conf_t *srvcf = ngx_http_get_module_srv_conf(r, ngx_http_websocket_stat_module);
+    ngx_http_websocket_stat_ctx *ctx = ngx_http_get_module_ctx(r, ngx_http_websocket_stat_module);
 
     int n = orig_recv(c, buf, size);
     if (n <= 0) {
@@ -184,6 +183,9 @@ my_recv(ngx_connection_t *c, u_char *buf, size_t size)
     }
 
     ssize_t sz = n;
+    template_ctx_s template_ctx;
+    template_ctx.from_client = 1;
+    template_ctx.ws_ctx = ctx;
 
     if (check_ws_age(ctx->ws_conn_start_time, r) != NGX_OK) {
         return NGX_ERROR;
