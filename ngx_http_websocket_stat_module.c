@@ -531,14 +531,13 @@ send_close_packet(ngx_connection_t *connection, int status, const char *reason)
     memset(cbuf, 0, sizeof(cbuf));
     cbuf[0] = 0x88; // Fin, Close : 1000 1000
     int rlen = strlen(reason);
-    rlen += 2;                       // add 2b status
     const int max_payload_len = 125; // wo extended len
     rlen = (rlen > max_payload_len) ? max_payload_len : rlen;
-    cbuf[1] = rlen;                 // Payload Len: 0... ....
+    const int cbuflen = rlen + 2;   // add 2b status
+    cbuf[1] = cbuflen;                 // Payload Len: 0... ....
     cbuf[2] = 0xFF & (status >> 8); // Status MSB : .... .... (Big Endian)
     cbuf[3] = 0xFF & status;        // Status LSB : .... ....
     memcpy(&cbuf[4], reason, rlen);
-    int cbuflen = rlen + 2;
     orig_send(connection, (unsigned char *)cbuf, cbuflen);
 }
 
