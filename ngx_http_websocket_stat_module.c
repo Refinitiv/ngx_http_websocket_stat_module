@@ -35,7 +35,7 @@ static ngx_int_t ngx_http_websocket_stat_configure(ngx_conf_t *cf);
 
 static void *ngx_http_websocket_stat_create_srv_conf(ngx_conf_t *cf);
 static char *ngx_http_websocket_stat_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child);
-const char *get_core_var(ngx_http_request_t *r, const char *variable);
+void get_core_var(ngx_http_request_t *r, const char *variable, char *buff);
 
 static void send_close_packet(ngx_connection_t *connection, int status,
                               const char *reason);
@@ -243,51 +243,54 @@ ngx_http_websocket_stat_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
     return ngx_http_next_body_filter(r, in);
 }
 
-char buff[100];
-
-const char *
-ws_packet_type(ngx_http_request_t *r, void *data)
+void
+ws_packet_type(ngx_http_request_t *r, void *data, char* buff)
 {
     template_ctx_s *ctx = data;
-    if (!ctx || !ctx->ws_ctx)
-        return UNKNOWN_VAR;
-    sprintf(buff, "%d", ctx->ws_ctx->frame_counter.current_frame_type);
-    return buff;
+    if (!ctx || !ctx->ws_ctx) {
+        sprintf(buff, UNKNOWN_VAR);
+    } else {
+        sprintf(buff, "%d", ctx->ws_ctx->frame_counter.current_frame_type);
+    }
 }
 
-const char *
-ws_packet_size(ngx_http_request_t *r, void *data)
+void
+ws_packet_size(ngx_http_request_t *r, void *data, char* buff)
 {
     template_ctx_s *ctx = data;
-    if (!ctx || !ctx->ws_ctx)
-        return UNKNOWN_VAR;
-    sprintf(buff, "%lu", ctx->ws_ctx->frame_counter.current_payload_size);
-    return (char *)buff;
+    if (!ctx || !ctx->ws_ctx) {
+        sprintf(buff, UNKNOWN_VAR);
+    } else {
+        sprintf(buff, "%lu", ctx->ws_ctx->frame_counter.current_payload_size);
+    }
 }
 
-const char *
-ws_message_size(ngx_http_request_t *r, void *data)
+void
+ws_message_size(ngx_http_request_t *r, void *data, char* buff)
 {
     template_ctx_s *ctx = data;
-    if (!ctx || !ctx->ws_ctx)
-        return UNKNOWN_VAR;
-    sprintf(buff, "%lu", ctx->ws_ctx->frame_counter.current_message_size);
-    return (char *)buff;
+    if (!ctx || !ctx->ws_ctx) {
+        sprintf(buff, UNKNOWN_VAR);
+    } else {
+        sprintf(buff, "%lu", ctx->ws_ctx->frame_counter.current_message_size);
+    }
 }
 
-const char *
-ws_packet_source(ngx_http_request_t *r, void *data)
+void
+ws_packet_source(ngx_http_request_t *r, void *data, char *buff)
 {
     template_ctx_s *ctx = data;
-    if (!ctx)
-        return UNKNOWN_VAR;
-    if (ctx->from_client)
-        return "client";
-    return "upstream";
+    if (!ctx) {
+        sprintf(buff, UNKNOWN_VAR);
+    } else if (ctx->from_client) {
+        sprintf(buff, "client");
+    } else {
+        sprintf(buff, "upstream");
+    }
 }
 
-const char *
-get_core_var(ngx_http_request_t *r, const char *variable)
+void
+get_core_var(ngx_http_request_t *r, const char *variable, char *buff)
 {
     ngx_int_t key = 0;
     ngx_http_variable_value_t *vv;
@@ -300,49 +303,48 @@ get_core_var(ngx_http_request_t *r, const char *variable)
     vv = ngx_http_get_variable(r, &var, key);
     memcpy(buff, vv->data, vv->len);
     buff[vv->len] = '\0';
-    return buff;
 }
 
-const char *
-ws_connection_age(ngx_http_request_t *r, void *data)
+void
+ws_connection_age(ngx_http_request_t *r, void *data, char *buff)
 {
     template_ctx_s *ctx = data;
-    if (!ctx || !ctx->ws_ctx)
-        return UNKNOWN_VAR;
-    sprintf(buff, "%lu", ngx_time() - ctx->ws_ctx->ws_conn_start_time);
-
-    return (char *)buff;
+    if (!ctx || !ctx->ws_ctx) {
+        sprintf(buff, UNKNOWN_VAR);
+    } else {
+        sprintf(buff, "%lu", ngx_time() - ctx->ws_ctx->ws_conn_start_time);
+    }
 }
 
-const char *
-local_time(ngx_http_request_t *r, void *data)
+void
+local_time(ngx_http_request_t *r, void *data, char *buff)
 {
-    return memcpy(buff, ngx_cached_http_time.data, ngx_cached_http_time.len);
+    memcpy(buff, ngx_cached_http_time.data, ngx_cached_http_time.len);
+    buff[ngx_cached_http_time.len] = '\0';
 }
 
-const char *
-remote_ip(ngx_http_request_t *r, void *data)
+void
+remote_ip(ngx_http_request_t *r, void *data, char *buff)
 {
     memcpy(buff, r->connection->addr_text.data, r->connection->addr_text.len);
     buff[r->connection->addr_text.len] = '\0';
-
-    return buff;
 }
 
-const char *
-upstream_addr(ngx_http_request_t *r, void *data)
+void
+upstream_addr(ngx_http_request_t *r, void *data, char *buff)
 {
-    if (r->upstream_states == NULL || r->upstream_states->nelts == 0)
-        return UNKNOWN_VAR;
-    ngx_http_upstream_state_t *state;
-    state = r->upstream_states->elts;
-    return (const char *)state->peer->data;
+    if (!r->upstream_states || r->upstream_states->nelts == 0) {
+        sprintf(buff, UNKNOWN_VAR);
+    } else {
+        ngx_http_upstream_state_t *state = r->upstream_states->elts;
+        sprintf(buff, (const char *)state->peer->data);
+    }
 }
 
 #define GEN_CORE_GET_FUNC(fname, var)                                          \
-    const char *fname(ngx_http_request_t *r, void *data)                       \
+    void fname(ngx_http_request_t *r, void *data, char *buff)                       \
     {                                                                          \
-        return get_core_var(r, var);                                           \
+        get_core_var(r, var, buff);                                           \
     }
 
 GEN_CORE_GET_FUNC(request, "request")
