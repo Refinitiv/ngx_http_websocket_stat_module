@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "ngx_http_websocket_stat_format.h"
@@ -11,7 +12,7 @@ const char *HTTP_VAR = "$http_";
 size_t HTTP_VAR_LEN = sizeof("$http_") - 1;
 
 template_variable null_variable = {NULL, 0, 0, NULL};
-void http_header_var(ngx_http_request_t *r, void *data, char *buff);
+void http_header_var(ngx_http_request_t *r, void *data, char *buff, size_t size);
 template_variable header_variable = {NULL, 0, 50, http_header_var};
 
 typedef struct {
@@ -199,13 +200,13 @@ apply_template(compiled_template *template_cmpl, ngx_http_request_t *r,
             ((variable_occurance **)
                  template_cmpl->variable_occurances->elts)[i];
         if (!occ->http_hdr) {
-            occ->variable->operation(r, data, buff);
+            occ->variable->operation(r, data, buff, sizeof(buff));
             size_t len = strlen(buff);
             memcpy(result + occ->pos, buff,
                    occ->variable->len < len ? occ->variable->len : len);
         } else {
             http_hdr_coccurance_ctx ctx = {template_cmpl->template, occ};
-            occ->variable->operation(r, &ctx, buff);
+            occ->variable->operation(r, &ctx, buff, sizeof(buff));
             size_t len = strlen(buff);
             memcpy(result + occ->pos, buff,
                    occ->variable->len < len ? occ->variable->len : len);
@@ -230,7 +231,7 @@ compare_hdr(const char *hdr, size_t hdr_len, const char *template)
 }
 
 void
-http_header_var(ngx_http_request_t *r, void *data, char *buff)
+http_header_var(ngx_http_request_t *r, void *data, char *buff, size_t size)
 {
 #ifndef TEST
     ngx_list_part_t *part;
@@ -242,8 +243,7 @@ http_header_var(ngx_http_request_t *r, void *data, char *buff)
     while (1) {
         if (compare_hdr((char *)header[i].key.data, ctx->occ->http_hdr,
                         ctx->template + ctx->occ->orig_pos + HTTP_VAR_LEN)) {
-            memcpy(buff, header[i].value.data, header[i].value.len);
-            buff[header[i].value.len] = '\0';
+            snprintf(buff, size, (const char*)header[i].value.data);
             return;
         } else if (--i < 0) {
             if (!part->next)
@@ -255,7 +255,7 @@ http_header_var(ngx_http_request_t *r, void *data, char *buff)
     }
 #endif
 
-    sprintf(buff, "???");
+    snprintf(buff, size, "???");
 }
 
 compiled_template *

@@ -1,6 +1,7 @@
 #include "ngx_http_websocket_stat_format.h"
 #include "ngx_http_websocket_stat_frame_counter.h"
 #include <assert.h>
+#include <stdio.h>
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_http.h>
@@ -35,7 +36,7 @@ static ngx_int_t ngx_http_websocket_stat_configure(ngx_conf_t *cf);
 
 static void *ngx_http_websocket_stat_create_srv_conf(ngx_conf_t *cf);
 static char *ngx_http_websocket_stat_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child);
-void get_core_var(ngx_http_request_t *r, const char *variable, char *buff);
+void get_core_var(ngx_http_request_t *r, const char *variable, char *buff, size_t size);
 
 static void send_close_packet(ngx_connection_t *connection, int status,
                               const char *reason);
@@ -47,7 +48,8 @@ typedef struct ngx_http_websocket_srv_conf_s {
     int max_ws_age;
     ngx_flag_t enabled;
     compiled_template *log_template;
-    compiled_template *log_message_template;
+    compiled_template *log_send_message_template;
+    compiled_template *log_recv_message_template;
     compiled_template *log_open_template;
     compiled_template *log_close_template;
     ngx_log_t *ws_log;
@@ -126,13 +128,14 @@ check_ws_age(time_t conn_start_time, ngx_http_request_t *r)
 }
 
 static compiled_template *
-get_ws_log_template(ngx_http_websocket_stat_ctx *ctx, ngx_http_websocket_srv_conf_t *srvcf) {
+get_ws_log_template(template_ctx_s *ctx, ngx_http_websocket_srv_conf_t *srvcf) {
+    ngx_http_websocket_stat_ctx *ws_ctx = ctx->ws_ctx;
+
     if (srvcf->log_template) {
         return srvcf->log_template;
-    } else if (ctx->frame_counter.fragment_final && ctx->frame_counter.current_frame_type < CLOSE) {
-        return srvcf->log_message_template;
+    } else if (ws_ctx && ws_ctx->frame_counter.fragment_final && ws_ctx->frame_counter.current_frame_type < CLOSE) {
+        return ctx->from_client ? srvcf->log_recv_message_template : srvcf->log_send_message_template;
     }
-
     return NULL;
 }
 
@@ -162,7 +165,7 @@ my_send(ngx_connection_t *c, u_char *buf, size_t size)
 
     while (sz > 0) {
         if (frame_counter_process_message(&buf, &sz, &(ctx->frame_counter))) {
-            ws_do_log(get_ws_log_template(ctx, srvcf), r, &template_ctx);
+            ws_do_log(get_ws_log_template(&template_ctx, srvcf), r, &template_ctx);
         }
     }
 
@@ -193,7 +196,7 @@ my_recv(ngx_connection_t *c, u_char *buf, size_t size)
 
     while (sz > 0) {
         if (frame_counter_process_message(&buf, &sz, &ctx->frame_counter)) {
-            ws_do_log(get_ws_log_template(ctx, srvcf), r, &template_ctx);
+            ws_do_log(get_ws_log_template(&template_ctx, srvcf), r, &template_ctx);
         }
     }
 
@@ -246,107 +249,106 @@ ngx_http_websocket_stat_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
 }
 
 void
-ws_packet_type(ngx_http_request_t *r, void *data, char* buff)
+ws_packet_type(ngx_http_request_t *r, void *data, char* buff, size_t size)
 {
     template_ctx_s *ctx = data;
     if (!ctx || !ctx->ws_ctx) {
-        sprintf(buff, UNKNOWN_VAR);
+        snprintf(buff, size, UNKNOWN_VAR);
     } else {
-        sprintf(buff, "%d", ctx->ws_ctx->frame_counter.current_frame_type);
+        snprintf(buff, size, "%d", ctx->ws_ctx->frame_counter.current_frame_type);
     }
 }
 
 void
-ws_packet_size(ngx_http_request_t *r, void *data, char* buff)
+ws_packet_size(ngx_http_request_t *r, void *data, char* buff, size_t size)
 {
     template_ctx_s *ctx = data;
     if (!ctx || !ctx->ws_ctx) {
-        sprintf(buff, UNKNOWN_VAR);
+        snprintf(buff, size, UNKNOWN_VAR);
     } else {
-        sprintf(buff, "%lu", ctx->ws_ctx->frame_counter.current_payload_size);
+        snprintf(buff, size, "%lu", ctx->ws_ctx->frame_counter.current_payload_size);
     }
 }
 
 void
-ws_message_size(ngx_http_request_t *r, void *data, char* buff)
+ws_message_size(ngx_http_request_t *r, void *data, char* buff, size_t size)
 {
     template_ctx_s *ctx = data;
     if (!ctx || !ctx->ws_ctx) {
-        sprintf(buff, UNKNOWN_VAR);
+        snprintf(buff, size, UNKNOWN_VAR);
     } else {
-        sprintf(buff, "%lu", ctx->ws_ctx->frame_counter.current_message_size);
+        snprintf(buff, size, "%lu", ctx->ws_ctx->frame_counter.current_message_size);
     }
 }
 
 void
-ws_packet_source(ngx_http_request_t *r, void *data, char *buff)
+ws_packet_source(ngx_http_request_t *r, void *data, char *buff, size_t size)
 {
     template_ctx_s *ctx = data;
     if (!ctx) {
-        sprintf(buff, UNKNOWN_VAR);
+        snprintf(buff, size, UNKNOWN_VAR);
     } else if (ctx->from_client) {
-        sprintf(buff, "client");
+        snprintf(buff, size, "client");
     } else {
-        sprintf(buff, "upstream");
+        snprintf(buff, size, "upstream");
     }
 }
 
 void
-get_core_var(ngx_http_request_t *r, const char *variable, char *buff)
+get_core_var(ngx_http_request_t *r, const char *variable, char *buff, size_t size)
 {
     ngx_int_t key = 0;
     ngx_http_variable_value_t *vv;
     ngx_str_t var;
     var.data = (u_char *)variable;
     var.len = strlen(variable);
-    while (*variable != '\0')
-        key = ngx_hash(key, *(variable++));
+    key = ngx_hash_strlow(var.data, var.data, var.len);
+
+    // while (*variable != '\0')
+    //     key = ngx_hash(key, *(variable++));
 
     vv = ngx_http_get_variable(r, &var, key);
-    memcpy(buff, vv->data, vv->len);
-    buff[vv->len] = '\0';
+    snprintf(buff, size, (const char*)vv->data);
 }
 
 void
-ws_connection_age(ngx_http_request_t *r, void *data, char *buff)
+ws_connection_age(ngx_http_request_t *r, void *data, char *buff, size_t size)
 {
     template_ctx_s *ctx = data;
     if (!ctx || !ctx->ws_ctx) {
-        sprintf(buff, UNKNOWN_VAR);
+        snprintf(buff, size, UNKNOWN_VAR);
     } else {
-        sprintf(buff, "%lu", ngx_time() - ctx->ws_ctx->ws_conn_start_time);
+        snprintf(buff, size, "%lu", ngx_time() - ctx->ws_ctx->ws_conn_start_time);
     }
 }
 
 void
-local_time(ngx_http_request_t *r, void *data, char *buff)
+local_time(ngx_http_request_t *r, void *data, char *buff, size_t size)
 {
-    memcpy(buff, ngx_cached_http_time.data, ngx_cached_http_time.len);
-    buff[ngx_cached_http_time.len] = '\0';
+    snprintf(buff, size, (char*)ngx_cached_http_time.data);
 }
 
 void
-remote_ip(ngx_http_request_t *r, void *data, char *buff)
+remote_ip(ngx_http_request_t *r, void *data, char *buff, size_t size)
 {
-    memcpy(buff, r->connection->addr_text.data, r->connection->addr_text.len);
-    buff[r->connection->addr_text.len] = '\0';
+    snprintf(buff, size, (char*)r->connection->addr_text.data);
 }
 
 void
-upstream_addr(ngx_http_request_t *r, void *data, char *buff)
+upstream_addr(ngx_http_request_t *r, void *data, char *buff, size_t size)
 {
     if (!r->upstream_states || r->upstream_states->nelts == 0) {
-        sprintf(buff, UNKNOWN_VAR);
+        snprintf(buff, size, UNKNOWN_VAR);
     } else {
         ngx_http_upstream_state_t *state = r->upstream_states->elts;
-        sprintf(buff, (const char *)state->peer->data);
+        snprintf(buff, size, (const char *)state->peer->data);
     }
 }
 
 #define GEN_CORE_GET_FUNC(fname, var)                                          \
-    void fname(ngx_http_request_t *r, void *data, char *buff)                       \
+    void fname(ngx_http_request_t *r, void *data, char *buff, size_t size)     \
     {                                                                          \
-        get_core_var(r, var, buff);                                           \
+        get_core_var(r, var, buff, size);                                           \
     }
 
 GEN_CORE_GET_FUNC(request, "request")
@@ -439,8 +441,12 @@ ngx_http_websocket_log_format(ngx_conf_t *cf, ngx_command_t *cmd, void *conf)
         srvcf->log_open_template =
             compile_template((char *)args[2].data, variables, cf->pool);
         return NGX_CONF_OK;
-    } else if (strcmp((char *)args[1].data, "message") == 0) {
-        srvcf->log_message_template =
+    } else if (strcmp((char *)args[1].data, "server") == 0) {
+        srvcf->log_send_message_template =
+            compile_template((char *)args[2].data, variables, cf->pool);
+        return NGX_CONF_OK;
+    } else if (strcmp((char *)args[1].data, "client") == 0) {
+        srvcf->log_recv_message_template =
             compile_template((char *)args[2].data, variables, cf->pool);
         return NGX_CONF_OK;
     } else {
@@ -493,7 +499,8 @@ ngx_http_websocket_stat_create_srv_conf(ngx_conf_t *cf)
     srvcf->max_ws_age = NGX_CONF_UNSET;
     srvcf->enabled = NGX_CONF_UNSET;
     srvcf->log_template = NGX_CONF_UNSET_PTR;
-    srvcf->log_message_template = NGX_CONF_UNSET_PTR;
+    srvcf->log_send_message_template = NGX_CONF_UNSET_PTR;
+    srvcf->log_recv_message_template = NGX_CONF_UNSET_PTR;
     srvcf->log_close_template = NGX_CONF_UNSET_PTR;
     srvcf->log_open_template = NGX_CONF_UNSET_PTR;
     srvcf->ws_log = NGX_CONF_UNSET_PTR;
@@ -510,7 +517,8 @@ ngx_http_websocket_stat_merge_srv_conf(ngx_conf_t *cf, void *parent, void *child
     ngx_conf_merge_value(conf->max_ws_age, prev->max_ws_age, -1);
     ngx_conf_merge_value(conf->enabled, prev->enabled, 0);
     ngx_conf_merge_ptr_value(conf->log_template, prev->log_template, NULL);
-    ngx_conf_merge_ptr_value(conf->log_message_template, prev->log_message_template, NULL);
+    ngx_conf_merge_ptr_value(conf->log_send_message_template, prev->log_send_message_template, NULL);
+    ngx_conf_merge_ptr_value(conf->log_recv_message_template, prev->log_recv_message_template, NULL);
     ngx_conf_merge_ptr_value(conf->log_close_template, prev->log_close_template, NULL);
     ngx_conf_merge_ptr_value(conf->log_open_template, prev->log_open_template, NULL);
     ngx_conf_merge_ptr_value(conf->ws_log, prev->ws_log, NULL);
