@@ -1,0 +1,10 @@
+FROM rust:alpine3.13
+
+USER root
+
+RUN apk add --no-cache musl-dev && cargo install websocat
+
+COPY ./docker/test_e2e.sh /usr/local/bin/test_e2e
+RUN chmod +x /usr/local/bin/test_e2e
+
+CMD ["test_e2e"]

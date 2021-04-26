@@ -1,0 +1,30 @@
+version: "3.6"
+services:
+    nginx:
+        command: nginx -g "daemon off;"
+        build:
+            context: .
+            dockerfile: ./docker/Dockerfile.nginx
+        volumes:
+            - ./docker/nginx.conf:/etc/nginx/nginx.conf
+            - logs:/var/log/nginx
+ 
+    test_e2e:
+        build:
+            context: .
+            dockerfile: ./docker/Dockerfile.e2e
+        environment:
+            - ENDPOINT=nginx
+            - LOG_FILE_PATH=/var/log/nginx/ws.log
+        volumes:
+            - logs:/var/log/nginx
+        depends_on:
+            - nginx
+
+    test:
+        build:
+            context: .
+            dockerfile: ./docker/Dockerfile.unit
+
+volumes:
+    logs:

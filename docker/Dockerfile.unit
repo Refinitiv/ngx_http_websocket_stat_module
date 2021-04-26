@@ -1,0 +1,23 @@
+FROM alpine:3.10
+
+USER root
+
+RUN apk add gcc check-dev musl-dev
+
+COPY ./src /tmp/ngx_http_websocket_stat_format/src
+COPY ./tests /tmp/ngx_http_websocket_stat_format/tests
+
+WORKDIR /tmp/ngx_http_websocket_stat_format
+
+ENV SRC_DIR="./src" \
+    DIST_DIR="./dist" \
+    TEST_DIR="./tests" \
+    TEST_DIST_DIR="./tests/dist"
+
+RUN mkdir ${DIST_DIR} ${TEST_DIST_DIR} && \
+    gcc -g -DTEST -g -c ${SRC_DIR}/ngx_http_websocket_stat_format.c -o ${DIST_DIR}/ngx_http_websocket_stat_format.o && \
+	gcc -g -DTEST ${TEST_DIR}/test_format.c -c -o ${TEST_DIST_DIR}/test_format.o -lcheck && \
+	gcc -g -DTEST ${TEST_DIST_DIR}/test_format.o ${DIST_DIR}/ngx_http_websocket_stat_format.o -lcheck -lrt -o ${TEST_DIST_DIR}/test_format && \
+	cp ${TEST_DIST_DIR}/test_format /usr/local/bin/ngx_http_websocket_stat_test && chmod +x /usr/local/bin/ngx_http_websocket_stat_test
+
+CMD ["ngx_http_websocket_stat_test"]

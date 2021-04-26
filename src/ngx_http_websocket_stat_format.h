@@ -20,9 +20,7 @@ typedef struct {
 
 #endif
 
-// typedef const char (*template_op)(ngx_http_request_t *r);
-
-typedef const char *(*template_op)(ngx_http_request_t *r, void *data);
+typedef void (*template_op)(ngx_http_request_t *r, void *data, char *buff, size_t size);
 
 typedef struct {
     char *name;

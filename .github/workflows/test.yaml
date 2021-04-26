@@ -1,0 +1,16 @@
+name: Test
+
+on: [pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Unit
+      run: |
+        make test
+    - name: E2E
+      run: |
+        make test_e2e
