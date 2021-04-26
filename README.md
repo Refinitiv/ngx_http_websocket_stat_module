@@ -1,4 +1,4 @@
-[![Travis Build Status](https://travis-ci.org/refinitiv/ngx_http_websocket_stat_module.svg?branch=master)](https://travis-ci.org/refinitiv/ngx_http_websocket_stat_module.svg?branch=master)
+![Tests](https://github.com/github/docs/actions/workflows/test.yml/badge.svg)
 
 
 # NGINX module websocket connection and traffic statistics
@@ -9,9 +9,9 @@ Nginx module developed for logging and displaying statistic of websocket proxy c
 
    1. Configure nginx adding this module with or build this module as a dynamic module:
    ```sh
-          ./configure (...) --add-module=./ngx_http_websocket_stat_module
+          ./configure (...) --add-module=./src/ngx_http_websocket_stat_module
           # or
-          ./configure (...) --add-dynamic-module=./ngx_http_websocket_stat_module && make modules
+          ./configure (...) --add-dynamic-module=./src/ngx_http_websocket_stat_module && make modules
    ```
 
 ## Usage
@@ -19,10 +19,9 @@ Nginx module developed for logging and displaying statistic of websocket proxy c
 To enable websocket frames logging specify `log_enabled on` and `ws_log_format` in server section of nginx config file. Additionally, specify `ws_log` to override the log file, which is used to log ws frames.
 
 To customize connection open and close log messages use "open" and "close" parameter for ws_log_format directive. 
-To log only when the full message is received/sent use "message" parameter for ws_log_format directive.
+To log only when the full message is received/sent use "server"/"client" parameters for ws_log_format directive.
 
 To set maximum single connection lifetime use ws_conn_age parameter. Argument is time given in nginx time format (e.g. 1s, 1m 1h and so on). When connection's lifetime is exceeding specified value there is close websocket packet with 4001 error code generated and connection is closed.
-
 
 Here is a list of variables you can use in log format string:
 
@@ -42,21 +41,7 @@ Here is a list of variables you can use in log format string:
  * $server_port - Server's port
  * $upstream_addr - websocket backend address
 
-## Example of configuration
-
-```
-
-server
-{
-   ws_log <path/to/logfile>;
-   ws_log_format "$time_local: packet of type $ws_opcode received from $ws_packet_source, packet size is $ws_payload_size";
-   ws_log_format open "$time_local: Connection opened";
-   ws_log_format close "$time_local: Connection closed";
-   ws_conn_age 12h;
-   ...
-}
-
-```
+See [nginx sample configuraion](docker/nginx.conf).
 
 ## Copyright
 
