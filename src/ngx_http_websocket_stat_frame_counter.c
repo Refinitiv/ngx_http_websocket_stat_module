@@ -73,23 +73,16 @@ frame_counter_process_message(u_char **buffer, ssize_t *size,
             break;
         case PAYLOAD_LEN_LARGE:
         case PAYLOAD_LEN_HUGE: {
-            int i;
-            if (frame_counter->stage == PAYLOAD_LEN_LARGE) {
-                assert(*size >= 2);
-                i = 2;
-            } else {
-                assert(*size >= 8);
-                i = 8;
+            frame_counter->bytes_consumed++;
+            frame_counter->current_payload_size <<= 8;
+            frame_counter->current_payload_size |= **buffer;
+            if ((frame_counter->stage == PAYLOAD_LEN_LARGE && frame_counter->bytes_consumed == 2) || 
+                (frame_counter->stage == PAYLOAD_LEN_HUGE && frame_counter->bytes_consumed == 8)) {
+                frame_counter->current_message_size += frame_counter->current_payload_size;
+                frame_counter->stage = frame_counter->payload_masked ? MASK : PAYLOAD;
+                frame_counter->bytes_consumed = 0;
             }
-            do {
-                frame_counter->current_payload_size <<= 8;
-                frame_counter->current_payload_size |= **buffer;
-                move_buffer(buffer, size, 1);
-            } while (--i);
-            frame_counter->current_message_size += frame_counter->current_payload_size;
-            frame_counter->stage =
-                frame_counter->payload_masked ? MASK : PAYLOAD;
-            frame_counter->bytes_consumed = 0;
+            move_buffer(buffer, size, 1);
             break;
         }
         case MASK:
