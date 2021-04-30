@@ -16,6 +16,11 @@ typedef struct {
 } ngx_http_websocket_stat_ctx;
 
 typedef struct {
+    ngx_http_websocket_stat_ctx recv_ctx;
+    ngx_http_websocket_stat_ctx send_ctx;
+} ngx_http_websocket_stat_request_ctx;
+
+typedef struct {
     char from_client : 1;
     ngx_http_websocket_stat_ctx *ws_ctx;
 
@@ -145,15 +150,15 @@ my_send(ngx_connection_t *c, u_char *buf, size_t size)
 {
     ngx_http_request_t *r = c->data;
     ngx_http_websocket_srv_conf_t *srvcf = ngx_http_get_module_srv_conf(r, ngx_http_websocket_stat_module);
-    ngx_http_websocket_stat_ctx *ctx = ngx_http_get_module_ctx(r, ngx_http_websocket_stat_module);
+    ngx_http_websocket_stat_request_ctx *request_ctx = ngx_http_get_module_ctx(r, ngx_http_websocket_stat_module);
 
-    if (check_ws_age(ctx->ws_conn_start_time, r) != NGX_OK) {
+    if (check_ws_age(request_ctx->send_ctx.ws_conn_start_time, r) != NGX_OK) {
         return NGX_ERROR;
     }
 
     template_ctx_s template_ctx;
     template_ctx.from_client = 0;
-    template_ctx.ws_ctx = ctx;
+    template_ctx.ws_ctx = &request_ctx->send_ctx;
 
     int n = orig_send(c, buf, size);
     if (n <= 0) {
@@ -164,7 +169,7 @@ my_send(ngx_connection_t *c, u_char *buf, size_t size)
     ssize_t sz = n;
 
     while (sz > 0) {
-        if (frame_counter_process_message(&buf, &sz, &(ctx->frame_counter))) {
+        if (frame_counter_process_message(&buf, &sz, &request_ctx->send_ctx.frame_counter)) {
             ws_do_log(get_ws_log_template(&template_ctx, srvcf), r, &template_ctx);
         }
     }
@@ -178,7 +183,7 @@ my_recv(ngx_connection_t *c, u_char *buf, size_t size)
 {
     ngx_http_request_t *r = c->data;
     ngx_http_websocket_srv_conf_t *srvcf = ngx_http_get_module_srv_conf(r, ngx_http_websocket_stat_module);
-    ngx_http_websocket_stat_ctx *ctx = ngx_http_get_module_ctx(r, ngx_http_websocket_stat_module);
+    ngx_http_websocket_stat_request_ctx *request_ctx = ngx_http_get_module_ctx(r, ngx_http_websocket_stat_module);
 
     int n = orig_recv(c, buf, size);
     if (n <= 0) {
@@ -188,14 +193,14 @@ my_recv(ngx_connection_t *c, u_char *buf, size_t size)
     ssize_t sz = n;
     template_ctx_s template_ctx;
     template_ctx.from_client = 1;
-    template_ctx.ws_ctx = ctx;
+    template_ctx.ws_ctx = &request_ctx->recv_ctx;
 
-    if (check_ws_age(ctx->ws_conn_start_time, r) != NGX_OK) {
+    if (check_ws_age(request_ctx->recv_ctx.ws_conn_start_time, r) != NGX_OK) {
         return NGX_ERROR;
     }
 
     while (sz > 0) {
-        if (frame_counter_process_message(&buf, &sz, &ctx->frame_counter)) {
+        if (frame_counter_process_message(&buf, &sz, &request_ctx->recv_ctx.frame_counter)) {
             ws_do_log(get_ws_log_template(&template_ctx, srvcf), r, &template_ctx);
         }
     }
@@ -224,23 +229,24 @@ ngx_http_websocket_stat_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
     if (r->headers_in.upgrade) {
         if (r->upstream->peer.connection) {
             // connection opened
-            ngx_http_websocket_stat_ctx *ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_websocket_stat_ctx));
+            ngx_http_websocket_stat_request_ctx *ctx = ngx_pcalloc(r->pool, sizeof(ngx_http_websocket_stat_request_ctx));
             if (!ctx) {
                 return NGX_HTTP_INTERNAL_SERVER_ERROR;
             }
             ngx_http_set_ctx(r, ctx, ngx_http_websocket_stat_module);
             template_ctx_s template_ctx;
-            template_ctx.ws_ctx = ctx;
+            template_ctx.ws_ctx = &ctx->recv_ctx;
             ws_do_log(srvcf->log_open_template, r, &template_ctx);
             orig_recv = r->connection->recv;
             r->connection->recv = my_recv;
             orig_send = r->connection->send;
             r->connection->send = my_send;
-            ctx->ws_conn_start_time = ngx_time();
+            ctx->recv_ctx.ws_conn_start_time = ngx_time();
+            ctx->send_ctx.ws_conn_start_time = ctx->recv_ctx.ws_conn_start_time;
         } else {
-            ngx_http_websocket_stat_ctx *ctx = ngx_http_get_module_ctx(r, ngx_http_websocket_stat_module);
+            ngx_http_websocket_stat_request_ctx *ctx = ngx_http_get_module_ctx(r, ngx_http_websocket_stat_module);
             template_ctx_s template_ctx;
-            template_ctx.ws_ctx = ctx;
+            template_ctx.ws_ctx = &ctx->recv_ctx;
             ws_do_log(srvcf->log_close_template, r, &template_ctx);
         }
     }
