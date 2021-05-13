@@ -1,4 +1,4 @@
-![Tests](https://github.com/github/docs/actions/workflows/test.yml/badge.svg)
+![Tests](https://github.com/chainstack/ngx_http_websocket_stat_module/actions/workflows/test.yaml/badge.svg)
 
 
 # NGINX module websocket connection and traffic statistics
