@@ -8,7 +8,8 @@ services:
         volumes:
             - ./docker/nginx.conf:/etc/nginx/nginx.conf
             - logs:/var/log/nginx
- 
+    echo:
+        image: jmalloc/echo-server:0.3.3
     test_e2e:
         build:
             context: .
@@ -20,7 +21,7 @@ services:
             - logs:/var/log/nginx
         depends_on:
             - nginx
-
+            - echo
     test:
         build:
             context: .
