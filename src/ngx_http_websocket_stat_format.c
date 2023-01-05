@@ -40,9 +40,9 @@ compare_occurance(const void *_first, const void *_second)
 ngx_array_t *
 ngx_array_create(void *pool, size_t size, size_t el_size)
 {
-    ngx_array_t *res = malloc(sizeof(ngx_array_t));
+    ngx_array_t *res = ngx_palloc(pool, sizeof(ngx_array_t));
     res->nelts = 0;
-    res->elts = malloc(100 * el_size);
+    res->elts = ngx_palloc(pool, 100 * el_size);
     res->el_size = el_size;
     return res;
 }
@@ -191,7 +191,7 @@ char *
 apply_template(compiled_template *template_cmpl, ngx_http_request_t *r,
                void *data)
 {
-    char *result = malloc(strlen(template_cmpl->compiled_template_str) + 1);
+    char *result = ngx_palloc(template_cmpl->pool, strlen(template_cmpl->compiled_template_str) + 1);
     strcpy(result, template_cmpl->compiled_template_str);
     unsigned int i;
     char buff[256];

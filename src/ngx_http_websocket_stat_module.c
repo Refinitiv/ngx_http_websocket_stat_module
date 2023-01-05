@@ -117,7 +117,7 @@ ws_do_log(compiled_template *template, ngx_http_request_t *r, void *ctx)
     if (!log_line) return;
     ngx_write_fd(srvcf->ws_log->file->fd, log_line, strlen(log_line));
     ngx_write_fd(srvcf->ws_log->file->fd, &CARET_RETURN, sizeof(char));
-    free(log_line);
+    ngx_pfree(template->pool, log_line);
 }
 
 static int

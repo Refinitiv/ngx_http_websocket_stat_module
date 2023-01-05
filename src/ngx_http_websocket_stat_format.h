@@ -5,7 +5,6 @@
 
 #define ngx_http_request_t void
 #define ngx_pool_t void
-#define ngx_palloc(pool, size) malloc(size)
 
 typedef struct {
     size_t nelts;
