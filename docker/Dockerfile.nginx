@@ -1,4 +1,4 @@
-FROM k8s.gcr.io/ingress-nginx/controller:v0.44.0 as builder
+FROM k8s.gcr.io/ingress-nginx/controller:v1.8.1 as builder
 
 USER root
 
@@ -7,12 +7,12 @@ WORKDIR /tmp
 RUN apk add git openssl-dev pcre-dev zlib-dev libc-dev gcc make
 RUN NGINX_VERSION=$(nginx -v 2>&1 | sed 's/nginx version: nginx\///') && \
     wget -qO- https://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz | tar xvz && \
-    mv nginx-${NGINX_VERSION} nginx
+    mv nginx-${NGINX_VERSION} chainstack
 COPY ./src /tmp/ngx_http_websocket_stat_module
-RUN cd ./nginx && \
+RUN cd ./chainstack && \
     ./configure  --with-compat \
     --add-dynamic-module=../ngx_http_websocket_stat_module && \
     make modules
 
-FROM k8s.gcr.io/ingress-nginx/controller:v0.44.0
-COPY --from=builder /tmp/nginx/objs/ngx_http_websocket_stat_module.so /etc/nginx/modules/
+FROM k8s.gcr.io/ingress-nginx/controller:v1.8.1
+COPY --from=builder /tmp/chainstack/objs/ngx_http_websocket_stat_module.so /etc/nginx/modules/

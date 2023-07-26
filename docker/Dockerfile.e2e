@@ -2,7 +2,7 @@ FROM rust:1.63.0-alpine3.16
 
 USER root
 
-RUN apk add --no-cache musl-dev openssl-dev pkgconfig && cargo install websocat
+RUN apk add --no-cache musl-dev openssl-dev pkgconfig websocat
 
 COPY ./docker/test_e2e.sh /usr/local/bin/test_e2e
 RUN chmod +x /usr/local/bin/test_e2e
