@@ -1,9 +1,10 @@
-#include "ngx_http_websocket_stat_format.h"
-#include "ngx_http_websocket_stat_frame_counter.h"
-#include <assert.h>
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_http.h>
+
+#include "ngx_http_websocket_stat_format.h"
+#include "ngx_http_websocket_stat_frame_counter.h"
+#include <assert.h>
 
 #include <openssl/bio.h>
 #include <openssl/evp.h>
@@ -334,9 +335,9 @@ my_send(ngx_connection_t *c, u_char *buf, size_t size)
     }
     int n = orig_send(c, buf, size);
     if (n < 0) {
-        if(!ngx_atomic_cmp_set(ngx_websocket_stat_active, 0, 0)){
-          ngx_atomic_fetch_add(ngx_websocket_stat_active, -1);
-          ws_do_log(log_close_template, r, &template_ctx);
+        if (!ngx_atomic_cmp_set(ngx_websocket_stat_active, 0, 0)) {
+            ngx_atomic_fetch_add(ngx_websocket_stat_active, -1);
+            ws_do_log(log_close_template, r, &template_ctx);
         }
     }
     return n;
@@ -415,9 +416,9 @@ ngx_http_websocket_stat_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
             ngx_atomic_fetch_add(ngx_websocket_stat_active, 1);
             ctx->ws_conn_start_time = ngx_time();
         } else {
-          if(!ngx_atomic_cmp_set(ngx_websocket_stat_active, 0, 0)){
-              ngx_atomic_fetch_add(ngx_websocket_stat_active, -1);
-              ws_do_log(log_close_template, r, &template_ctx);
+            if (!ngx_atomic_cmp_set(ngx_websocket_stat_active, 0, 0)) {
+                ngx_atomic_fetch_add(ngx_websocket_stat_active, -1);
+                ws_do_log(log_close_template, r, &template_ctx);
             }
         }
     }
@@ -546,9 +547,9 @@ const template_variable variables[] = {
     {VAR_NAME("$ws_conn_age"), NGX_SIZE_T_LEN, ws_connection_age},
     {VAR_NAME("$time_local"), sizeof("Mon, 23 Oct 2017 11:27:42 GMT") - 1,
      local_time},
-    {VAR_NAME("$upstream_addr"), 60, upstream_addr},
-    {VAR_NAME("$request"), 60, request},
-    {VAR_NAME("$uri"), 60, uri},
+    {VAR_NAME("$upstream_addr"), 160, upstream_addr},
+    {VAR_NAME("$request"), 160, request},
+    {VAR_NAME("$uri"), 160, uri},
     {VAR_NAME("$request_id"), UID_LENGTH, request_id},
     {VAR_NAME("$remote_user"), 60, remote_user},
     {VAR_NAME("$remote_addr"), 60, remote_addr},
