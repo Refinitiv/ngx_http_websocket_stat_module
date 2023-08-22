@@ -402,6 +402,8 @@ ngx_http_websocket_stat_body_filter(ngx_http_request_t *r, ngx_chain_t *in)
             if (ctx == NULL) {
                 return NGX_HTTP_INTERNAL_SERVER_ERROR;
             }
+            template_ctx.ws_ctx = ctx;
+
             const char *request_id_str = get_core_var(r, "request_id");
             ctx->connection_id.data = ngx_pcalloc(r->pool, UID_LENGTH + 1);
             ctx->connection_id.len = UID_LENGTH;
